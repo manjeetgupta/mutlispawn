@@ -17,15 +17,18 @@ import (
 var applicaitonpidStateMap = map[string]pidState{}
 var runtimedeploymentMap = map[int]appDetailruntime{}
 var deploymentConfigurationMap map[string][]appDetail
-var ch = make(chan int, 3)
+var ch = make(chan int, 5)
 var wg sync.WaitGroup
 var stateFileName string
 var arg string
 
 var (
-	Info    *log.Logger
+	// Info    :  Special Information
+	Info *log.Logger
+	// Warning :There is something you need to know about
 	Warning *log.Logger
-	Error   *log.Logger
+	// Error   :Something has failed
+	Error *log.Logger
 )
 
 func init() {
@@ -37,9 +40,6 @@ func init() {
 	}
 
 	// file can be replaced with os.Stdout or os.Stderr)
-	// Info    = "Special Information"
-	// Warning = "There is something you need to know about"
-	// Error   = "Something has failed"
 
 	Info = log.New(file,
 		"INFO: ",
