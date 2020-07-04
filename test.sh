@@ -32,5 +32,11 @@ echo "Start stage 3..Reparent" >> $LOGFILE
 sleep 5
 ./5spawn 103 &
 
+echo "Start stage 4..Kill reparented child" >>$LOGFILE
+pidc=$(pidof THANOS)
+echo $pidc >>$LOGFILE
+kill -9 $pidc
+
+sleep 5
 echo "Exit!" >> $LOGFILE
 exit
