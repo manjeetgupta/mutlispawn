@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -210,7 +211,7 @@ func spawnApp(name string, arg string) (chan int, error) {
 
 	wg.Add(1)
 	go func() {
-		Info.Println("2----Waiting for", cmd.Process.Pid)
+		fmt.Println("2----Waiting for", cmd.Process.Pid)
 		cmd.Wait()
 		defer wg.Done()
 		if _, found := runtimedeploymentMap[cmd.Process.Pid]; found { //if not checked then both will waits ( line 322 and this one)
@@ -228,6 +229,7 @@ func main() {
 
 	Info.Println("...............................................")
 	Info.Println("AMSM has started on hardware ID :", arg)
+	fmt.Println("AMSM has started on hardware ID :", arg)
 	Info.Println("<>Inside main funtion")
 	var pidExistStatus bool = false
 
@@ -287,18 +289,71 @@ func main() {
 			err = syscall.PtraceAttach(pidState.Pid)
 			if err != nil {
 				Error.Println("1*---PtraceAttach error:", err)
-				//break
+			}
+			var ws syscall.WaitStatus
+			_, err := syscall.Wait4(pidState.Pid, &ws, syscall.WSTOPPED, nil)
+			if err != nil {
+				Error.Printf("1*---Error waiting after ptrace attach in pid %d :%v\n", pidState.Pid, err)
 			}
 
-			time.Sleep(1 * time.Millisecond)
-			err = syscall.PtraceCont(pidState.Pid, 0)
-			//err = syscall.PtraceCont(pidState.Pid,syscall.SIGCONT)
-			if err != nil {
-				Error.Println("1*---PtraceCont error:", err)
-				//break
+			if ws.Exited() {
+				Error.Println("1*---Exited:Normal termination")
+			}
+			if ws.Signaled() {
+				Error.Println("1*---Signaled:Abnormal termination")
+			}
+			if ws.Continued() {
+				Error.Println("1*---Continued")
+			}
+			if ws.CoreDump() {
+				Error.Println("1*---CoreDump")
+			}
+			if ws.Stopped() {
+				time.Sleep(1 * time.Millisecond)
+				Info.Println("1----Stop signal is : ", ws.StopSignal())
+				err = syscall.PtraceCont(pidState.Pid, 0)
+				if err != nil {
+					Error.Println("1*---PtraceCont error:", err)
+				}
+
+				var ws syscall.WaitStatus
+				_, err := syscall.Wait4(pidState.Pid, &ws, syscall.WNOHANG, nil)
+				if err != nil {
+					Error.Printf("1*---Error waiting after ptrace continue in pid %d :%v\n", pidState.Pid, err)
+				}
+
+				if ws.Exited() {
+					Info.Println("1----Exited:Normal termination")
+				}
+				if ws.Signaled() {
+					Error.Println("1*---Signaled:Abnormal termination")
+				}
+				if ws.Continued() {
+					Error.Println("1*---Continued")
+				}
+				if ws.CoreDump() {
+					Error.Println("1*---CoreDump")
+				}
+				if ws.Stopped() {
+					Error.Println("1*---Stopped")
+				}
+
+				go func() {
+					var ws syscall.WaitStatus
+					wpid, err := syscall.Wait4(-1, &ws, syscall.WSTOPPED, nil) // -1 indicates that wait for all children
+					if wpid == -1 {
+						fmt.Println("6*---Error wait4() = -1 :", err, ws)
+					}
+					if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
+						fmt.Println("6----Pid present in runtimedeploymentMap,so writing to channel")
+						syscall.Kill(wpid, syscall.SIGKILL)
+						ch <- wpid
+					}
+				}()
 			}
 
 			if err == nil {
+				Info.Println("1----PtraceCont successful")
 				for i := 0; i < len(element); i++ {
 					if element[i].CsciName == appName {
 						Info.Println("1----App added to runtime deployment map after reparenting:", appName)
@@ -335,19 +390,19 @@ func main() {
 		//close(ch)
 	}()
 
-	go func() {
-		var ws syscall.WaitStatus
-		wpid, err := syscall.Wait4(-1, &ws, syscall.WALL, nil) // -1 indicates that wait for all children
-		if wpid == -1 {
-			Error.Println("6*---Error wait4() = -1 :", err, ws)
-		}
-		Warning.Println("6----Wait4 triggered ( PID Signal):", wpid, ws)
+	// go func() {
+	// 	var ws syscall.WaitStatus
+	// 	wpid, err := syscall.Wait4(-1, &ws, syscall.WALL, nil) // -1 indicates that wait for all children
+	// 	if wpid == -1 {
+	// 		Error.Println("6*---Error wait4() = -1 :", err, ws)
+	// 	}
+	// 	Warning.Println("6----Wait4 triggered ( PID Signal):", wpid, ws)
 
-		if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
-			Info.Println("6----Pid present in runtimedeploymentMap,so writing to channel")
-			ch <- wpid
-		}
-	}()
+	// 	if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
+	// 		Info.Println("6----Pid present in runtimedeploymentMap,so writing to channel")
+	// 		ch <- wpid
+	// 	}
+	// }()
 
 	for {
 		elem, ok := <-ch

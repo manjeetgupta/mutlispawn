@@ -6,20 +6,20 @@ LOGFILE=test.log
 echo "Launch.." >> $LOGFILE
 ./5spawn 103 &
 
-echo "Start stage 1.." >> $LOGFILE
-sleep 5
-for i in {1..5}
-do   
-    echo "Round" $i >> $LOGFILE
-    r=$(($RANDOM %10))
-    if [ $((r % 2)) == 0 ]
-    then
-        pkill LOKI
-    else
-        pkill THANOS
-    fi    
-    sleep 5
-done
+# echo "Start stage 1.." >> $LOGFILE
+# sleep 5
+# for i in {1..5}
+# do   
+#     echo "Round" $i >> $LOGFILE
+#     r=$(($RANDOM %10))
+#     if [ $((r % 2)) == 0 ]
+#     then
+#         pkill LOKI
+#     else
+#         pkill THANOS
+#     fi    
+#     sleep 5
+# done
 
 
 echo "Start stage 2.." >> $LOGFILE
