@@ -28,14 +28,24 @@ pkill 5spawn
 pkill LOKI
 
 
+pidthanos=$(pidof THANOS)
+echo $pidthanos >> $LOGFILE
+
 echo "Start stage 3..Reparent" >> $LOGFILE
 sleep 5
 ./5spawn 103 &
+
+pidthanos=$(pidof THANOS)
+echo $pidthanos >> $LOGFILE
 
 echo "Start stage 4..Kill reparented child" >>$LOGFILE
 pidc=$(pidof THANOS)
 echo $pidc >>$LOGFILE
 kill -9 $pidc
+
+pidthanos=$(pidof THANOS)
+echo $pidthanos >> $LOGFILE
+
 
 sleep 5
 echo "Exit!" >> $LOGFILE

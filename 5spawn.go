@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 )
 
 var applicaitonpidStateMap = map[string]pidState{}
@@ -262,7 +261,7 @@ func main() {
 	element := deploymentConfigurationMap["1"+arg]
 	for _, apptospawn := range element {
 		Info.Println("1----", apptospawn)
-		Info.Println("1----", apptospawn.CsciName)
+		//Info.Println("1----", apptospawn.CsciName)
 	}
 
 	//=================================================
@@ -297,23 +296,23 @@ func main() {
 			}
 
 			if ws.Exited() {
-				Error.Println("1*---Exited:Normal termination")
+				Error.Println("1*---Exited:Normal termination after PtraceAttach")
 			}
 			if ws.Signaled() {
-				Error.Println("1*---Signaled:Abnormal termination")
+				Error.Println("1*---Signaled:Abnormal termination after PtraceAttach")
 			}
 			if ws.Continued() {
-				Error.Println("1*---Continued")
+				Error.Println("1*---Continued after PtraceAttach")
 			}
 			if ws.CoreDump() {
-				Error.Println("1*---CoreDump")
+				Error.Println("1*---CoreDump after PtraceAttach")
 			}
 			if ws.Stopped() {
-				time.Sleep(1 * time.Millisecond)
-				Info.Println("1----Stop signal is : ", ws.StopSignal())
+				//time.Sleep(10 * time.Millisecond)
+				Info.Println("1----Stop signal after PtraceAttach : ", ws.StopSignal())
 				err = syscall.PtraceCont(pidState.Pid, 0)
 				if err != nil {
-					Error.Println("1*---PtraceCont error:", err)
+					Error.Println("1*---PtraceCont error:", err, pidState.Pid)
 				}
 
 				var ws syscall.WaitStatus
@@ -323,19 +322,19 @@ func main() {
 				}
 
 				if ws.Exited() {
-					Info.Println("1----Exited:Normal termination")
+					Info.Println("1----Exited:Normal termination after PtraceCont")
 				}
 				if ws.Signaled() {
-					Error.Println("1*---Signaled:Abnormal termination")
+					Error.Println("1*---Signaled:Abnormal termination after PtraceCont")
 				}
 				if ws.Continued() {
-					Error.Println("1*---Continued")
+					Error.Println("1*---Continued after PtraceCont")
 				}
 				if ws.CoreDump() {
-					Error.Println("1*---CoreDump")
+					Error.Println("1*---CoreDump after PtraceCont")
 				}
 				if ws.Stopped() {
-					Error.Println("1*---Stopped")
+					Error.Println("1*---Stopped after PtraceCont")
 				}
 
 				go func() {
