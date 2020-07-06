@@ -1,5 +1,6 @@
 #!/bin/bash
 LOGFILE=test.log
+PAUSETIME=2
 
 #rm -f $LOGFILE
 
@@ -7,7 +8,7 @@ echo "Launch.." >> $LOGFILE
 ./5spawn 103 &
 
 # echo "Start stage 1.." >> $LOGFILE
-# sleep 5
+# sleep $PAUSETIME
 # for i in {1..5}
 # do   
 #     echo "Round" $i >> $LOGFILE
@@ -18,35 +19,32 @@ echo "Launch.." >> $LOGFILE
 #     else
 #         pkill THANOS
 #     fi    
-#     sleep 5
+#     sleep $PAUSETIME
 # done
 
 
 echo "Start stage 2.." >> $LOGFILE
-sleep 5
+sleep $PAUSETIME
 pkill 5spawn
 pkill LOKI
-
-
 pidthanos=$(pidof THANOS)
-echo $pidthanos >> $LOGFILE
+echo "Pid of app before reparent: "$pidthanos" " >> $LOGFILE
 
 echo "Start stage 3..Reparent" >> $LOGFILE
-sleep 5
+sleep $PAUSETIME
 ./5spawn 103 &
-
 pidthanos=$(pidof THANOS)
-echo $pidthanos >> $LOGFILE
+echo "Pid of app after reparent: "$pidthanos" " >> $LOGFILE
 
 echo "Start stage 4..Kill reparented child" >>$LOGFILE
+sleep $PAUSETIME
 pidc=$(pidof THANOS)
-echo $pidc >>$LOGFILE
 kill -9 $pidc
-
+echo "Pid of app to which SIGKILL is sent: "$pidthanos" " >> $LOGFILE
+sleep 1
 pidthanos=$(pidof THANOS)
-echo $pidthanos >> $LOGFILE
+echo "Pid of app after respawning: "$pidthanos" " >> $LOGFILE
 
-
-sleep 5
+sleep $PAUSETIME
 echo "Exit!" >> $LOGFILE
 exit
