@@ -14,6 +14,7 @@ import (
 	"syscall"
 )
 
+var redundantDeploymentMap = map[string]uint8{}
 var applicaitonpidStateMap = map[string]pidState{}
 var runtimedeploymentMap = map[int]appDetailruntime{}
 var deploymentConfigurationMap map[string][]appDetail
@@ -21,6 +22,7 @@ var ch = make(chan int, 5)
 var wg sync.WaitGroup
 var stateFileName string
 var arg string
+var lastDigit int
 
 var (
 	// Info    :  Special Information
@@ -33,6 +35,8 @@ var (
 
 func init() {
 	arg = os.Args[1]
+	lastDigit, _ = strconv.Atoi(arg)
+	lastDigit = lastDigit % 10
 	logFileName := "amsm" + arg + ".log"
 	file, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -208,6 +212,16 @@ func spawnApp(name string, arg string) (chan int, error) {
 	Info.Println("2----", runtimedeploymentMap)
 	storeMap(applicaitonpidStateMap)
 
+	// Update the redundantDeploymentMap
+	if v, found := redundantDeploymentMap[name]; found {
+		fmt.Printf("2----%s state before in redundantDeploymentMap :%08b\n", name, v)
+		v = v ^ 1<<lastDigit
+		redundantDeploymentMap[name] = v
+		v, _ := redundantDeploymentMap[name]
+		fmt.Printf("2----%s state after spawning in redundantDeploymentMap :%08b\n", name, v)
+	}
+	updateRedundantDeploymentMap()
+
 	wg.Add(1)
 	go func() {
 		fmt.Println("2----Waiting for", cmd.Process.Pid)
@@ -224,6 +238,66 @@ func spawnApp(name string, arg string) (chan int, error) {
 
 }
 
+func initializeRedundantDeploymentMap() {
+	fmt.Println("<>Inside initializeRedundantDeploymentMap funtion")
+
+	jsonString, err := json.Marshal(redundantDeploymentMap)
+	if err != nil {
+		fmt.Println("7*---Marshall()", err)
+		return
+	}
+	fmt.Println("7----Marshalled Map to save in redundantDeploymentMap.json:", string(jsonString))
+	f, err := os.Create("redundantDeploymentMap.json")
+	if err != nil {
+		fmt.Println("7*---Create()", err)
+		return
+	}
+	l, err := f.WriteString(string(jsonString))
+	if err != nil {
+		fmt.Println("7*---Write()", err)
+		return
+	}
+	fmt.Printf("7----%v Bytes successfully in redundantdeploymentMap.json\n", l)
+
+	err = f.Close()
+	if err != nil {
+		fmt.Println("7*---Close()", err)
+		return
+	}
+	fmt.Println("<>Leaving initializeRedundantDeploymentMap funtion")
+}
+
+func updateRedundantDeploymentMap() {
+
+	fmt.Println("<>Inside updateRedundantDeploymentMap funtion")
+	jsonString, err := json.Marshal(redundantDeploymentMap)
+	if err != nil {
+		fmt.Println("8*---Marshall()", err)
+		return
+	}
+	fmt.Println("8----Marshalled Map to save in redundantDeploymentMap.json:", string(jsonString))
+
+	f, err := os.OpenFile("redundantDeploymentMap.json", os.O_WRONLY, 0755)
+	if err != nil {
+		fmt.Println("8*---Open()", err)
+		return
+	}
+	l, err := f.WriteString(string(jsonString))
+	if err != nil {
+		fmt.Println("8*---Write()", err)
+		return
+	}
+	fmt.Printf("8----%v Bytes successfully in redundantdeploymentMap.json\n", l)
+
+	err = f.Close()
+	if err != nil {
+		fmt.Println("8*---Close()", err)
+		return
+	}
+
+	fmt.Println("<>Leaving updateRedundantDeploymentMap funtion")
+}
+
 func main() {
 
 	Info.Println("...............................................")
@@ -237,7 +311,19 @@ func main() {
 	deploymentFileContent = readXML("DeploymentConfiguration.xml")
 	deploymentConfigurationMap = make(map[string][]appDetail)
 
+	//Initialize redundant map file if absent
+	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
+		fmt.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
+		for i := 0; i < len(deploymentFileContent.App); i++ {
+			if deploymentFileContent.App[i].Redundant {
+				redundantDeploymentMap[deploymentFileContent.App[i].CsciName] = 0
+			}
+		}
+		initializeRedundantDeploymentMap()
+	}
+
 	for i := 0; i < len(deploymentFileContent.App); i++ {
+		//Generate key
 		s := strings.TrimSpace(deploymentFileContent.App[i].HardwareID)
 		listOfHardware := strings.Split(s, ",")
 		for j := range listOfHardware {
@@ -256,6 +342,21 @@ func main() {
 			}
 		}
 	}
+
+	//Read the redundant map in memeory
+	jsonFile, err := os.Open("redundantDeploymentMap.json")
+	defer jsonFile.Close()
+	if err != nil {
+		fmt.Println("1*---", err)
+	} else {
+		jsonString, _ := ioutil.ReadAll(jsonFile)
+		err = json.Unmarshal(jsonString, &redundantDeploymentMap)
+		if err != nil {
+			fmt.Println("1*---Unmarshalling error:", err)
+		}
+		fmt.Printf("1----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+	}
+
 	//Info.Println("1----Complete DeploymentMap:\n", deploymentConfigurationMap)
 	Info.Println("1----Hardware", arg, "is configured for following applications:")
 	element := deploymentConfigurationMap["1"+arg]
@@ -267,7 +368,7 @@ func main() {
 	//=================================================
 
 	stateFileName = "ClientState" + arg + ".json"
-	jsonFile, err := os.Open(stateFileName)
+	jsonFile, err = os.Open(stateFileName)
 	defer jsonFile.Close()
 	if err != nil {
 		Error.Println("1*---", err)
