@@ -305,13 +305,11 @@ func main() {
 	fmt.Println("AMSM has started on hardware ID :", arg)
 	Info.Println("<>Inside main funtion")
 	var pidExistStatus bool = false
-
-	//========================Creating Deployment map=========================
 	var deploymentFileContent appList
 	deploymentFileContent = readXML("DeploymentConfiguration.xml")
 	deploymentConfigurationMap = make(map[string][]appDetail)
 
-	//Initialize redundant map file if absent
+	//Initialize redundantDeploymentMap.json file if absent
 	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
 		fmt.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
 		for i := 0; i < len(deploymentFileContent.App); i++ {
@@ -321,7 +319,7 @@ func main() {
 		}
 		initializeRedundantDeploymentMap()
 	}
-
+	//Creating Deployment map
 	for i := 0; i < len(deploymentFileContent.App); i++ {
 		//Generate key
 		s := strings.TrimSpace(deploymentFileContent.App[i].HardwareID)
@@ -343,7 +341,15 @@ func main() {
 		}
 	}
 
-	//Read the redundant map in memeory
+	//Info.Println("1----Complete DeploymentMap:\n", deploymentConfigurationMap)
+	Info.Println("1----Hardware", arg, "is configured for following applications:")
+	element := deploymentConfigurationMap["1"+arg]
+	for _, apptospawn := range element {
+		Info.Println("1----", apptospawn)
+		//Info.Println("1----", apptospawn.CsciName)
+	}
+
+	//Read the Redundant map in memeory
 	jsonFile, err := os.Open("redundantDeploymentMap.json")
 	defer jsonFile.Close()
 	if err != nil {
@@ -357,16 +363,7 @@ func main() {
 		fmt.Printf("1----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
 	}
 
-	//Info.Println("1----Complete DeploymentMap:\n", deploymentConfigurationMap)
-	Info.Println("1----Hardware", arg, "is configured for following applications:")
-	element := deploymentConfigurationMap["1"+arg]
-	for _, apptospawn := range element {
-		Info.Println("1----", apptospawn)
-		//Info.Println("1----", apptospawn.CsciName)
-	}
-
-	//=================================================
-
+	//Read the ClientState map in memeory
 	stateFileName = "ClientState" + arg + ".json"
 	jsonFile, err = os.Open(stateFileName)
 	defer jsonFile.Close()
@@ -381,6 +378,7 @@ func main() {
 		Info.Printf("1----Map read from %v: %v\n", stateFileName, applicaitonpidStateMap)
 	}
 
+	//Reparenting Check
 	for appName, pidState := range applicaitonpidStateMap {
 		pidExistStatus = isPid(pidState.Pid)
 		Info.Println("1----isPid() returned (", pidExistStatus, ") for PID:", pidState.Pid)
@@ -467,7 +465,7 @@ func main() {
 
 	}
 
-	//=============================================================================
+	//Spawning of applicatons
 	Info.Println("1----Spawning of applicatons after reparenting check")
 	for _, apptospawn := range element {
 		Info.Println("1----", apptospawn.CsciName)
@@ -485,25 +483,13 @@ func main() {
 		Info.Println("1----No new application to spawn")
 	}
 
+	//Wait  for sync group
 	go func() {
-		wg.Wait() //waitsync
+		wg.Wait()
 		//close(ch)
 	}()
 
-	// go func() {
-	// 	var ws syscall.WaitStatus
-	// 	wpid, err := syscall.Wait4(-1, &ws, syscall.WALL, nil) // -1 indicates that wait for all children
-	// 	if wpid == -1 {
-	// 		Error.Println("6*---Error wait4() = -1 :", err, ws)
-	// 	}
-	// 	Warning.Println("6----Wait4 triggered ( PID Signal):", wpid, ws)
-
-	// 	if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
-	// 		Info.Println("6----Pid present in runtimedeploymentMap,so writing to channel")
-	// 		ch <- wpid
-	// 	}
-	// }()
-
+	//Infinite loop to read from channel
 	for {
 		elem, ok := <-ch
 		if ok {
@@ -514,6 +500,15 @@ func main() {
 			nameTemp := appDetailruntimeTemp.CsciName
 			argTemp := appDetailruntimeTemp.ListOfArguments
 			delete(runtimedeploymentMap, elem)
+			if v, found := redundantDeploymentMap[nameTemp]; found {
+				fmt.Printf("1----%s state after crash in redundantDeploymentMap :%08b\n", nameTemp, v)
+				v = v ^ 1<<lastDigit
+				redundantDeploymentMap[nameTemp] = v
+				v, _ := redundantDeploymentMap[nameTemp]
+				fmt.Printf("1----%s old state has been reset in redundantDeploymentMap :%08b\n", nameTemp, v)
+				updateRedundantDeploymentMap()
+			}
+
 			ch, err = spawnApp(nameTemp, argTemp)
 			if err != nil {
 				Warning.Println("1----Error in spawning", err)
