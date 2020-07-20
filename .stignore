@@ -1,0 +1,6 @@
+.*
+*.log
+*.go
+*.json
+*.sh
+!redundantDeploymentMap.json

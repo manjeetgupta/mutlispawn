@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var redundantDeploymentMap = map[string]uint8{}
@@ -56,6 +58,26 @@ func init() {
 	Error = log.New(file,
 		"ERROR: ",
 		log.Ldate|log.Ltime|log.Llongfile)
+}
+
+// A Event Struct
+type Event []struct {
+	SubscriptionID int         `json:"id"`
+	GlobalID       int         `json:"globalID"`
+	Time           time.Time   `json:"time"`
+	Type           string      `json:"type"`
+	Data           DataDetails `json:"data"`
+}
+
+// A DataDetails Struct
+type DataDetails struct {
+	Action     string `json:"action"`
+	Folder     string `json:"folder"`
+	FolderID   string `json:"folderID"`
+	Label      string `json:"label"`
+	ModifiedBy string `json:"modifiedBy"`
+	Path       string `json:"path"`
+	Type       string `json:"type"`
 }
 
 type appDetailruntime struct {
@@ -489,6 +511,8 @@ func main() {
 		//close(ch)
 	}()
 
+	go fileChangeNotifier()
+
 	//Infinite loop to read from channel
 	for {
 		elem, ok := <-ch
@@ -515,4 +539,63 @@ func main() {
 			}
 		}
 	}
+}
+
+func fileChangeNotifier() {
+	var mostRecentID int
+	var mostRecentIDstr string
+
+	for {
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=LocalChangeDetected", nil)
+		if err != nil {
+			log.Fatal("Error Reading request", err)
+		}
+
+		req.Header.Set("X-API-Key", "crSRLDA6wkz75FuSYoeMtCcdoVi4tsJg")
+		q := req.URL.Query()
+		q.Add("since", mostRecentIDstr)
+
+		req.URL.RawQuery = q.Encode()
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal("Error Reading response", err)
+		}
+
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
+
+		responseBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal("Error Reading body", err)
+		}
+
+		var responseObject Event
+		json.Unmarshal(responseBody, &responseObject)
+		fmt.Println(string(responseBody))
+		fmt.Println("Length of Response:", len(responseObject))
+
+		if len(responseObject) > 0 {
+			for i := 0; i < len(responseObject); i++ {
+				fmt.Println("ID:", responseObject[i].SubscriptionID)
+				// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
+				// 	fmt.Println("Time:", responseObject[i].Time)
+				// 	fmt.Println("Type:", responseObject[i].Type)
+				// 	fmt.Println("Data->Action:", responseObject[i].Data.Action)
+				// 	fmt.Println("Data->Folder:", responseObject[i].Data.Folder)
+				// 	fmt.Println("Data->FolderID:", responseObject[i].Data.FolderID)
+				// 	fmt.Println("Data->Label:", responseObject[i].Data.Label)
+				// 	fmt.Println("Data->ModifiedBy:", responseObject[i].Data.ModifiedBy)
+				// 	fmt.Println("Data->Path:", responseObject[i].Data.Path)
+				// 	fmt.Println("Data->Type:", responseObject[i].Data.Type)
+			}
+			mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
+			mostRecentIDstr = strconv.Itoa(mostRecentID)
+		}
+		fmt.Println("In for..")
+		time.Sleep(100 * time.Millisecond)
+	}
+
 }
