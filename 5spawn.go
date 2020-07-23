@@ -111,6 +111,113 @@ type appDetail struct {
 	ListOfArguments string   `xml:"list_of_arguments"`
 }
 
+//Tag:9
+func readRedundantDeploymentMapFile() {
+
+	Info.Println("<>Inside readRedundantDeploymentMapFile funtion")
+	jsonFile, err := os.Open("redundantDeploymentMap.json")
+	defer jsonFile.Close()
+
+	if err != nil {
+		fmt.Println("9*---File open error:", err)
+	} else {
+		jsonString, _ := ioutil.ReadAll(jsonFile)
+		err = json.Unmarshal(jsonString, &redundantDeploymentMap)
+		if err != nil {
+			fmt.Println("9*---Unmarshalling error:", err)
+			return
+		}
+		fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+	}
+	Info.Println("<>Leaving readRedundantDeploymentMapFile funtion")
+}
+
+//Tag:8
+func readClientStateMapFile() {
+	Info.Println("<>Inside readClientStateMapFile funtion")
+	stateFileName = "ClientState" + arg + ".json"
+	jsonFile, err := os.Open(stateFileName)
+	defer jsonFile.Close()
+	if err != nil {
+		Error.Println("8*---", err)
+	} else {
+		jsonString, _ := ioutil.ReadAll(jsonFile)
+		err = json.Unmarshal(jsonString, &applicaitonpidStateMap)
+		if err != nil {
+			Error.Println("8*---Unmarshalling error:", err)
+			return
+		}
+		Info.Printf("8---Map read from %v: %v\n", stateFileName, applicaitonpidStateMap)
+	}
+	Info.Println("<>Leaving readClientStateMapFile funtion")
+}
+
+//Tag:7
+func initializeRedundantDeploymentMap() {
+	Info.Println("<>Inside initializeRedundantDeploymentMap funtion")
+
+	jsonString, err := json.Marshal(redundantDeploymentMap)
+	if err != nil {
+		Error.Println("7*---Marshall()", err)
+		return
+	}
+	Info.Println("7----Marshalled Map to be saved in redundantDeploymentMap.json @initialization:", string(jsonString))
+	f, err := os.Create("redundantDeploymentMap.json")
+	if err != nil {
+		Error.Println("7*---Create()", err)
+		return
+	}
+	l, err := f.WriteString(string(jsonString))
+	if err != nil {
+		Error.Println("7*---Write()", err)
+		return
+	}
+	Info.Printf("7----%v Bytes successfully in redundantdeploymentMap.json\n", l)
+
+	err = f.Close()
+	if err != nil {
+		Error.Println("7*---Close()", err)
+		return
+	}
+	Info.Println("<>Leaving initializeRedundantDeploymentMap funtion")
+}
+
+//Tag:6
+func updateRedundantDeploymentMap() {
+
+	fmt.Println("<>Inside updateRedundantDeploymentMap funtion")
+	jsonString, err := json.Marshal(redundantDeploymentMap)
+	if err != nil {
+		fmt.Println("6*---Marshall()", err)
+		return
+	}
+	fmt.Println("6----Marshalled Map to be saved in redundantDeploymentMap.json:", string(jsonString))
+
+	f, err := os.OpenFile("redundantDeploymentMap.json", os.O_RDWR, 0777)
+	defer f.Close()
+
+	if err != nil {
+		fmt.Println("6*---Open()", err)
+		return
+	}
+
+	l, err := f.WriteString(string(jsonString))
+	if err != nil {
+		fmt.Println("6*---Write()", err)
+		return
+	}
+	fmt.Printf("6----%v Bytes successfully in redundantdeploymentMap.json\n", l)
+
+	err = f.Close()
+	if err != nil {
+		fmt.Println("6*---Close()", err)
+		return
+	}
+
+	fmt.Println("<>Leaving updateRedundantDeploymentMap funtion")
+}
+
+//Tag:5
 func readXML(filename string) appList {
 
 	Info.Println("<>Inside readXML funtion")
@@ -145,8 +252,7 @@ func readXML(filename string) appList {
 	return deploymentFileContent
 }
 
-//===========================
-
+//Tag:4
 func isPid(pid int) bool {
 
 	Info.Println("<>Inside isPid funtion")
@@ -185,6 +291,7 @@ func isPid(pid int) bool {
 	return false
 }
 
+//Tag:3
 func storeMap(applicaitonpidStateMap map[string]pidState) {
 
 	Info.Println("<>Inside storeMap funtion")
@@ -217,6 +324,7 @@ func storeMap(applicaitonpidStateMap map[string]pidState) {
 	Info.Println("<>Leaving storeMap funtion")
 }
 
+//Tag:2
 func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, error) {
 
 	Info.Println("<>Inside spawnApp funtion")
@@ -277,12 +385,13 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 	}
 
 	wg.Add(1)
+	//Tag:G1
 	go func() {
-		fmt.Println("2----Waiting for", cmd.Process.Pid)
+		fmt.Println("G1----Waiting for", cmd.Process.Pid)
 		cmd.Wait()
 		defer wg.Done()
 		if _, found := runtimedeploymentMap[cmd.Process.Pid]; found { //if not checked then both will waits ( line 322 and this one)
-			Info.Println("2----Pid present in runtimedeploymentMap,so writing to channel")
+			fmt.Println("G1----Pid present in runtimedeploymentMap,so writing to channel")
 			ch <- cmd.Process.Pid
 		}
 	}()
@@ -292,66 +401,7 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 
 }
 
-func initializeRedundantDeploymentMap() {
-	fmt.Println("<>Inside initializeRedundantDeploymentMap funtion")
-
-	jsonString, err := json.Marshal(redundantDeploymentMap)
-	if err != nil {
-		fmt.Println("7*---Marshall()", err)
-		return
-	}
-	fmt.Println("7----Marshalled Map to save in redundantDeploymentMap.json:", string(jsonString))
-	f, err := os.Create("redundantDeploymentMap.json")
-	if err != nil {
-		fmt.Println("7*---Create()", err)
-		return
-	}
-	l, err := f.WriteString(string(jsonString))
-	if err != nil {
-		fmt.Println("7*---Write()", err)
-		return
-	}
-	fmt.Printf("7----%v Bytes successfully in redundantdeploymentMap.json\n", l)
-
-	err = f.Close()
-	if err != nil {
-		fmt.Println("7*---Close()", err)
-		return
-	}
-	fmt.Println("<>Leaving initializeRedundantDeploymentMap funtion")
-}
-
-func updateRedundantDeploymentMap() {
-
-	fmt.Println("<>Inside updateRedundantDeploymentMap funtion")
-	jsonString, err := json.Marshal(redundantDeploymentMap)
-	if err != nil {
-		fmt.Println("8*---Marshall()", err)
-		return
-	}
-	fmt.Println("8----Marshalled Map to save in redundantDeploymentMap.json:", string(jsonString))
-
-	f, err := os.OpenFile("redundantDeploymentMap.json", os.O_WRONLY, 0755)
-	if err != nil {
-		fmt.Println("8*---Open()", err)
-		return
-	}
-	l, err := f.WriteString(string(jsonString))
-	if err != nil {
-		fmt.Println("8*---Write()", err)
-		return
-	}
-	fmt.Printf("8----%v Bytes successfully in redundantdeploymentMap.json\n", l)
-
-	err = f.Close()
-	if err != nil {
-		fmt.Println("8*---Close()", err)
-		return
-	}
-
-	fmt.Println("<>Leaving updateRedundantDeploymentMap funtion")
-}
-
+//Tag:1
 func main() {
 
 	Info.Println("...............................................")
@@ -362,6 +412,7 @@ func main() {
 	var deploymentFileContent appList
 	deploymentFileContent = readXML("DeploymentConfiguration.xml")
 	deploymentConfigurationMap = make(map[string][]appDetail)
+	var err error
 
 	//Initialize redundantDeploymentMap.json file if absent
 	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
@@ -404,36 +455,39 @@ func main() {
 	}
 
 	//Read the Redundant map in memeory
-	jsonFile, err := os.Open("redundantDeploymentMap.json")
-	defer jsonFile.Close()
-	if err != nil {
-		fmt.Println("1*---", err)
-	} else {
-		jsonString, _ := ioutil.ReadAll(jsonFile)
-		err = json.Unmarshal(jsonString, &redundantDeploymentMap)
-		if err != nil {
-			fmt.Println("1*---Unmarshalling error:", err)
-		}
-		fmt.Printf("1----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
-	}
+	readRedundantDeploymentMapFile()
+	// jsonFile, err := os.Open("redundantDeploymentMap.json")
+	// defer jsonFile.Close()
+	// if err != nil {
+	// 	fmt.Println("1*---", err)
+	// } else {
+	// 	jsonString, _ := ioutil.ReadAll(jsonFile)
+	// 	err = json.Unmarshal(jsonString, &redundantDeploymentMap)
+	// 	if err != nil {
+	// 		fmt.Println("1*---Unmarshalling error:", err)
+	// 	}
+	// 	fmt.Printf("1----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+	// }
 
 	//Read the ClientState map in memeory
-	stateFileName = "ClientState" + arg + ".json"
-	jsonFile, err = os.Open(stateFileName)
-	defer jsonFile.Close()
-	if err != nil {
-		Error.Println("1*---", err)
-	} else {
-		jsonString, _ := ioutil.ReadAll(jsonFile)
-		err = json.Unmarshal(jsonString, &applicaitonpidStateMap)
-		if err != nil {
-			Error.Println("1*---Unmarshalling error:", err)
-		}
-		Info.Printf("1----Map read from %v: %v\n", stateFileName, applicaitonpidStateMap)
-	}
+	readClientStateMapFile()
+	// stateFileName = "ClientState" + arg + ".json"
+	// jsonFile, err = os.Open(stateFileName)
+	// defer jsonFile.Close()
+	// if err != nil {
+	// 	Error.Println("1*---", err)
+	// } else {
+	// 	jsonString, _ := ioutil.ReadAll(jsonFile)
+	// 	err = json.Unmarshal(jsonString, &applicaitonpidStateMap)
+	// 	if err != nil {
+	// 		Error.Println("1*---Unmarshalling error:", err)
+	// 	}
+	// 	Info.Printf("1----Map read from %v: %v\n", stateFileName, applicaitonpidStateMap)
+	// }
 
 	//Reparenting Check
 	for appName, pidState := range applicaitonpidStateMap {
+		//var err error
 		pidExistStatus = isPid(pidState.Pid)
 		Info.Println("1----isPid() returned (", pidExistStatus, ") for PID:", pidState.Pid)
 		if pidExistStatus {
@@ -489,15 +543,15 @@ func main() {
 				if ws.Stopped() {
 					Error.Println("1*---Stopped after PtraceCont")
 				}
-
+				//Tag:G2
 				go func() {
 					var ws syscall.WaitStatus
 					wpid, err := syscall.Wait4(-1, &ws, syscall.WSTOPPED, nil) // -1 indicates that wait for all children
 					if wpid == -1 {
-						fmt.Println("6*---Error wait4() = -1 :", err, ws)
+						fmt.Println("G2*---Error wait4() = -1 :", err, ws)
 					}
 					if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
-						fmt.Println("6----Pid present in runtimedeploymentMap,so writing to channel")
+						fmt.Println("G2----Pid present in runtimedeploymentMap,so writing to channel")
 						syscall.Kill(wpid, syscall.SIGKILL)
 						ch <- wpid
 					}
@@ -544,6 +598,7 @@ func main() {
 	}
 
 	//Wait  for sync group
+	//Tag:G3
 	go func() {
 		wg.Wait()
 		//close(ch)
@@ -587,35 +642,29 @@ func main() {
 				if v, found := redundantDeploymentMap[nameTemp]; found {
 					fmt.Printf("1----Inside crash:%s state just after crash in redundantDeploymentMap :%016b\n", nameTemp, v)
 					//check its state bit in map
-					//statebit=lastDigit+8
 					//if v & 1<<statebit !=0
 					// then it is set ...means active failed...else passive failed
 					statebit := lastDigit + 8
-					//v = v ^ 1<<lastDigit
 
 					if v&(1<<statebit) == 0 {
-						fmt.Printf("1----Inside crash:Passive instance crashed")
+						fmt.Println("1----Inside crash:Passive instance crashed")
 						ch, err = spawnApp(nameTemp, argTemp, false, true)
 					} else {
-						//v = v ^ 1<<(lastDigit+8)
+
 						//Check whether it is single instance or multiple
 						vv := v
 						vv = vv &^ (1 << lastDigit)
 						vv = vv &^ (1 << statebit)
-						//v & 1 << lastDigit
+
 						if vv == 0 {
-							fmt.Printf("1----Inside crash:Active instance crashed, Single Instance")
+							fmt.Println("1----Inside crash:Active instance crashed, Single Instance")
 							ch, err = spawnApp(nameTemp, argTemp, false, true)
 						} else {
-							fmt.Printf("1----Inside crash:Active instance crashed, Multiple Instance")
+							fmt.Println("1----Inside crash:Active instance crashed, Multiple Instance")
 							ch, err = spawnApp(nameTemp, argTemp, true, true)
 						}
 
 					}
-					//redundantDeploymentMap[nameTemp] = v
-					//v, _ := redundantDeploymentMap[nameTemp]
-					//fmt.Printf("1----Inside crash:%s old state has been reset in redundantDeploymentMap :%016b\n", nameTemp, v)
-					//updateRedundantDeploymentMap()
 				}
 			} else { //For Non redundant Apps
 				ch, err = spawnApp(nameTemp, argTemp, false, false)
@@ -627,6 +676,7 @@ func main() {
 	}
 }
 
+//Tag:G4
 func fileChangeNotifier() {
 	fmt.Println("<>Inside fileChangeNotifier funtion")
 
@@ -634,13 +684,13 @@ func fileChangeNotifier() {
 	var mostRecentIDstr string
 
 	startFor := <-chStartNotifier
-	fmt.Println("startFor --->", startFor)
+	fmt.Println("G4----startFor recieved:", startFor)
 	if startFor {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
 			if err != nil {
-				log.Fatal("Error Reading request", err)
+				fmt.Println("*G4---Error Reading request", err)
 			}
 
 			req.Header.Set("X-API-Key", "manjeettest")
@@ -651,7 +701,7 @@ func fileChangeNotifier() {
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Fatal("Error Reading response", err)
+				fmt.Println("*G4---Error Reading response", err)
 			}
 
 			if resp.Body != nil {
@@ -660,18 +710,18 @@ func fileChangeNotifier() {
 
 			responseBody, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				log.Fatal("Error Reading body", err)
+				fmt.Println("*G4---Error Reading body", err)
 			}
 
 			var responseObject Event
 			json.Unmarshal(responseBody, &responseObject)
-			fmt.Println(string(responseBody))
-			fmt.Println("Length of Response:", len(responseObject))
+			fmt.Println("G4----Response recieved:", string(responseBody))
+			fmt.Println("G4----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
 				//Read the file and implement logic. TODO
 				for i := 0; i < len(responseObject); i++ {
-					fmt.Println("ID:", responseObject[i].SubscriptionID)
+					fmt.Println("G4---ID:", responseObject[i].SubscriptionID)
 					// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
 					// 	fmt.Println("Time:", responseObject[i].Time)
 					// 	fmt.Println("Type:", responseObject[i].Type)
@@ -686,17 +736,18 @@ func fileChangeNotifier() {
 				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
 				mostRecentIDstr = strconv.Itoa(mostRecentID)
 			}
-			fmt.Println("Request completed..")
+			fmt.Println("G4---Request completed..")
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
 	fmt.Println("<>Leaving fileChangeNotifier funtion")
 }
 
+//Tag:G5
 func stateResponder() {
-	fmt.Println("<>Inside stateResponder funtion")
+	Info.Println("<>Inside stateResponder funtion")
 	startFor := <-chStartNotifier
-	fmt.Println("startFor --->", startFor)
+	fmt.Println("G5----startFor recieved:", startFor)
 	if startFor {
 
 		http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
@@ -707,66 +758,33 @@ func stateResponder() {
 			keys, ok := req.URL.Query()["name"]
 
 			if !ok || len(keys[0]) < 1 {
-				fmt.Println("Url Param 'name' is missing")
+				fmt.Println("*G5---Url Param 'name' is missing")
 				return
 			}
 
 			key := keys[0]
-			fmt.Println("State requested for : " + string(key))
+			fmt.Println("G5----State requested for : " + string(key))
 			//Get the state from json.
 			readRedundantDeploymentMapFile()
 
 			if v, found := redundantDeploymentMap[key]; found {
-				fmt.Printf("1----%s State present in redundantDeploymentMap :%016b\n", key, v)
+				fmt.Printf("G5----%s State present in redundantDeploymentMap :%016b\n", key, v)
 				//vv := string(v)
 				statebit := lastDigit + 8
-				fmt.Println("statebit==", statebit)
+				//fmt.Println("G3statebit==", statebit)
 				if v&(1<<statebit) == 0 {
-					fmt.Println("1----Server replied 0")
+					fmt.Println("G5----Server replied 0")
 					fmt.Fprint(res, "0")
 				} else {
-					fmt.Println("1----Server replied 1")
+					fmt.Println("G5----Server replied 1")
 					fmt.Fprint(res, "1")
 				}
 
-				//case1: single instance,after initialization
-				//case2: multiple instance,after initializatoin,actve already in system
-				///case3: multiple instance,after passive crash or multiple instance, passive initialization: state bit is already SET:read json and respond
-				//case4: multiple instance,after active crash
-				///case5: single instance,after active crash:state bit is already SET:read json and respond
-
-				//v = v | 1<<lastDigit
-				//statebit := lastDigit + 8
-				//v = v & ^(1 << statebit)
-				//redundantDeploymentMap[name] = v
-				//v, _ := redundantDeploymentMap[name]
-				//fmt.Printf("2----%s state after spawning in redundantDeploymentMap :%016b\n", name, v)
 			}
-			//updateRedundantDeploymentMap()
-			//fmt.Fprint(res, "1")
 
 		})
 
 		http.ListenAndServe(":9000", nil)
 	}
-	fmt.Println("<>Leaving stateResponder funtion")
-}
-
-func readRedundantDeploymentMapFile() {
-
-	fmt.Println("<>Inside readRedundantDeploymentMapFile funtion")
-	jsonFile, err := os.Open("redundantDeploymentMap.json")
-	defer jsonFile.Close()
-
-	if err != nil {
-		fmt.Println("1*---File open error:", err)
-	} else {
-		jsonString, _ := ioutil.ReadAll(jsonFile)
-		err = json.Unmarshal(jsonString, &redundantDeploymentMap)
-		if err != nil {
-			fmt.Println("1*---Unmarshalling error:", err)
-		}
-		fmt.Printf("1----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
-	}
-	fmt.Println("<>Leaving readRedundantDeploymentMapFile funtion")
+	Info.Println("<>Leaving stateResponder funtion")
 }
