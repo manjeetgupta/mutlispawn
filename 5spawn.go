@@ -186,20 +186,21 @@ func initializeRedundantDeploymentMap() {
 func updateRedundantDeploymentMap() {
 
 	fmt.Println("<>Inside updateRedundantDeploymentMap funtion")
+
+	//f, err := os.OpenFile("redundantDeploymentMap.json", os.O_RDWR, 0777)
+	f, err := os.Create("redundantDeploymentMap.json")
+	defer f.Close()
+	if err != nil {
+		fmt.Println("6*---Open()", err)
+		return
+	}
+
 	jsonString, err := json.Marshal(redundantDeploymentMap)
 	if err != nil {
 		fmt.Println("6*---Marshall()", err)
 		return
 	}
 	fmt.Println("6----Marshalled Map to be saved in redundantDeploymentMap.json:", string(jsonString))
-
-	f, err := os.OpenFile("redundantDeploymentMap.json", os.O_RDWR, 0777)
-	defer f.Close()
-
-	if err != nil {
-		fmt.Println("6*---Open()", err)
-		return
-	}
 
 	l, err := f.WriteString(string(jsonString))
 	if err != nil {
@@ -296,6 +297,7 @@ func storeMap(applicaitonpidStateMap map[string]pidState) {
 
 	Info.Println("<>Inside storeMap funtion")
 	f, err := os.Create(stateFileName)
+	defer f.Close()
 	if err != nil {
 		Error.Println("3*---", err)
 		return
@@ -311,7 +313,6 @@ func storeMap(applicaitonpidStateMap map[string]pidState) {
 	l, err := f.WriteString(string(jsonString))
 	if err != nil {
 		Error.Println("3*---", err)
-		f.Close()
 		return
 	}
 	Info.Printf("3----%v Bytes successfully in %v\n", l, stateFileName)
