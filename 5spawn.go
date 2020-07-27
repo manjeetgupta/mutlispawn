@@ -624,9 +624,21 @@ func main() {
 	go func() {
 		sig := <-sigs
 		fmt.Println("G8----Graceful Exit:", sig)
-		//cmd := exec.Command("pkill", "syncthing")
-		//err := cmd.Run()
-		//fmt.Printf("G8----Syncthing killled with error: %v\n", err)
+
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/shutdown", nil)
+		if err != nil {
+			fmt.Println("*G8---Error Creating request", err)
+		}
+		req.Header.Set("X-API-Key", "manjeettest")
+		_, err = client.Do(req)
+		if err != nil {
+			fmt.Println("*G8---Error Reading response.", err)
+		}
+
+		cmd := exec.Command("pkill", "syncthing")
+		err = cmd.Run()
+		fmt.Printf("G8----Syncthing exited with error: %v\n", err)
 		os.Exit(1)
 	}()
 
@@ -637,11 +649,26 @@ func main() {
 		//close(ch)
 	}()
 
-	chStartFileNotifier <- true
-	//This should become active only after Initialzaton is complete.
+	//This should become active only after Initialzaton is complete and sync is running.
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/status", nil)
+	if err != nil {
+		fmt.Println("*G4---Error Creating request", err)
+	}
+
+	req.Header.Set("X-API-Key", "manjeettest")
+	_, err = client.Do(req)
+	if err != nil {
+		fmt.Println("*G4---Error Reading response.", err)
+		os.Exit(1)
+	} else {
+		fmt.Println("G4----Server is up & running.")
+		chStartFileNotifier <- true
+		chStartStateResponder <- true
+	}
+
 	go fileChangeNotifier()
 
-	chStartStateResponder <- true
 	go stateResponder()
 
 	go nodeConnectionNotifier()
@@ -728,7 +755,7 @@ func fileChangeNotifier() {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
 			if err != nil {
-				fmt.Println("*G4---Error Reading request", err)
+				fmt.Println("*G4---Error Creating request", err)
 			}
 
 			req.Header.Set("X-API-Key", "manjeettest")
@@ -739,7 +766,7 @@ func fileChangeNotifier() {
 
 			resp, err := client.Do(req)
 			if err != nil {
-				fmt.Println("*G4---Error Reading response", err)
+				fmt.Println("*G4---Error Reading response.", err)
 			}
 
 			if resp.Body != nil {
@@ -875,28 +902,32 @@ func nodeDisconnectionNotifier() {
 						if responseObject[i].GlobalID > nodeConnectionMap[mapKey].GloabalID {
 							pingresult := pingtest(nodeConnectionMap[mapKey].Address)
 							if pingresult == false {
-								fmt.Println("G6----Device disconecion is confirmed.Delete from nodeConnenctionMap")
+								fmt.Println("G6----Device disconecion is confirmed as PING failed:Delete from nodeConnenctionMap")
 								lastDigittemp, _ := strconv.Atoi(nodeConnectionMap[mapKey].HardwareID)
 								delete(nodeConnectionMap, mapKey)
-								fmt.Printf("G6----Node Map:%v", nodeConnectionMap)
+								fmt.Printf("G6----Node Map:%v\n", nodeConnectionMap)
 								lastDigittemp %= 10
 								fmt.Println("G6----Last Digit:", lastDigittemp)
 
+								//Diconnected node may have multiple apps,so scan whole map
 								for key, v := range redundantDeploymentMap {
-									fmt.Printf("%s==>%016b", key, v)
+									fmt.Printf("G6----%s==>%016b\n", key, v)
 									statebittemp := lastDigittemp + 8
-									if v&(1<<lastDigittemp) == 1 && v&(1<<statebittemp) == 0 {
-										//Reset lastdigittemp
+									c1 := v & (1 << lastDigittemp)
+									c2 := v & (1 << statebittemp)
+									fmt.Println("G6----c1:", c1, "---c2", c2)
+									if c1 > 0 && c2 == 0 { //Passive
+										fmt.Println("G6----Passive Case:")
 										v = v &^ (1 << lastDigittemp)
 										redundantDeploymentMap[key] = v
-										fmt.Printf("After Change: %s==>%016b", key, v)
+										fmt.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
 										break
-									} else if v&(1<<lastDigittemp) == 1 && v&(1<<statebittemp) == 1 {
-										//Reset both lastdigittenp & statebittemp
+									} else if c1 > 0 && c2 > 1 { //Active
+										fmt.Println("G6----Active Case:")
 										v = v &^ (1 << lastDigittemp)
 										v = v &^ (1 << statebittemp)
 										vv := v
-										fmt.Printf("G6----%s state before searching for other node in redundantDeploymentMap :%016b\n", key, v)
+										fmt.Printf("G6----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
 										for i := 0; i < 8; i++ {
 											if vv&1 == 1 {
 												statebit := i + 8
@@ -905,12 +936,14 @@ func nodeDisconnectionNotifier() {
 											vv = vv >> 1
 										}
 										redundantDeploymentMap[key] = v
-										fmt.Printf("After Change: %s==>%016b", key, v)
+										fmt.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
 										break
 									}
 								}
 								//Write in file.TODO
 								updateRedundantDeploymentMap()
+							} else {
+								fmt.Println("G6----Ping Passed:So node is online:May be either Reparenting or Crashed on that node.")
 							}
 						}
 					}
