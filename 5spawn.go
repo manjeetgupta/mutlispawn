@@ -155,7 +155,7 @@ func updateRedundantDeploymentMap() {
 		Error.Println("6*---Marshall()", err)
 		return
 	}
-	fmt.Println("6----Marshalled Map to be saved in redundantDeploymentMap.json:", string(jsonString))
+	fmt.Println("6----Marshalled Map going to be saved in redundantDeploymentMap.json:", string(jsonString))
 
 	l, err := f.WriteString(string(jsonString))
 	if err != nil {
@@ -370,7 +370,7 @@ func main() {
 	deploymentConfigurationMap = make(map[string][]appDetail)
 	var err error
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGSEGV)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGSEGV, syscall.SIGABRT)
 
 	//Initialize redundantDeploymentMap.json file if absent
 	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
@@ -585,9 +585,9 @@ func main() {
 		json.Unmarshal(responseBody, &configResponse)
 		//fmt.Println("G4----Response recieved for Config:", string(responseBody))
 
-		fmt.Println("G4----Device ID:", configResponse.Devices[0].DeviceID, "Device Name:", configResponse.Devices[0].Name)
-		fmt.Println("G4----Device ID:", configResponse.Devices[1].DeviceID, "Device Name:", configResponse.Devices[1].Name)
-
+		for i := 0; i < len(configResponse.Devices); i++ {
+			fmt.Println("G4----Device ID:", configResponse.Devices[i].DeviceID, "Device Name:", configResponse.Devices[i].Name)
+		}
 		//New request for connections
 		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/connections", nil)
 		if err != nil {
@@ -753,7 +753,7 @@ func fileChangeNotifier() {
 			fmt.Println("G4----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
-				//Read the file and implement logic. TODO
+				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
 				for i := 0; i < len(responseObject); i++ {
 					fmt.Println("G4---ID:", responseObject[i].SubscriptionID)
 					// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
