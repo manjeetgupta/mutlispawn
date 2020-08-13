@@ -15,8 +15,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/sparrc/go-ping"
 )
 
 var nodeConnectionMap = map[string]nodeData{}
@@ -535,21 +533,24 @@ func main() {
 		sig := <-sigs
 		fmt.Println("G8----Graceful Exit:", sig)
 
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/shutdown", nil)
-		if err != nil {
-			fmt.Println("*G8---Error Creating request", err)
-		}
-		req.Header.Set("X-API-Key", "manjeettest")
-		_, err = client.Do(req)
-		if err != nil {
-			fmt.Println("*G8---Error Reading response.", err)
-		}
+		fmt.Println("G8----Node removal triggered:")
+		triggerNodeRemovalSelf()
 
-		cmd := exec.Command("pkill", "syncthing")
-		err = cmd.Run()
-		fmt.Printf("G8----Syncthing exited with error: %v\n", err)
-		os.Exit(1)
+		// client := &http.Client{}
+		// req, err := http.NewRequest("POST", "http://localhost:8384/rest/system/shutdown", nil)
+		// if err != nil {
+		// 	fmt.Println("*G8---Error Creating request", err)
+		// }
+		// req.Header.Set("X-API-Key", "manjeettest")
+		// _, err = client.Do(req)
+		// if err != nil {
+		// 	fmt.Println("*G8---Error Reading response.", err)
+		// }
+
+		// cmd := exec.Command("/usr/bin/pkill", "syncthing")
+		// err = cmd.Run()
+		// fmt.Printf("G8----Syncthing exited with error: %v\n", err)
+		os.Exit(0)
 	}()
 
 	//Wait  for sync group
@@ -1012,27 +1013,75 @@ func nodeConnectionNotifier() {
 
 //Tag:10
 func pingtest(ipaddress string) bool {
-	Info.Println("<>Inside pingtest funtion(10)")
-	fmt.Println("10----Ping test on:", ipaddress)
-	var ret bool
-	pinger, err := ping.NewPinger(ipaddress)
-	if err != nil {
-		fmt.Println("10----Pinger creation error:", err)
-		return false
-	}
-	pinger.Count = 3
-	pinger.Timeout = time.Second * 1
-	pinger.Interval = time.Millisecond * 200
+	// Info.Println("<>Inside pingtest funtion(10)")
+	// fmt.Println("10----Ping test on:", ipaddress)
+	// var ret bool
+	// pinger, err := ping.NewPinger(ipaddress)
+	// if err != nil {
+	// 	fmt.Println("10----Pinger creation error:", err)
+	// 	return false
+	// }
+	// pinger.Count = 3
+	// pinger.Timeout = time.Second * 1
+	// pinger.Interval = time.Millisecond * 200
 
-	pinger.Run()
-	stats := pinger.Statistics()
-	fmt.Println("10----Statistics", stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-	if stats.PacketLoss > 0 {
-		ret = false
-	} else {
-		ret = true
+	// pinger.Run()
+	// stats := pinger.Statistics()
+	// fmt.Println("10----Statistics", stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
+	// if stats.PacketLoss > 0 {
+	// 	ret = false
+	// } else {
+	// 	ret = true
+	// }
+	// fmt.Println("10----Return value from pingtest:", ret)
+	// Info.Println("<>Leaving pingtest funtion(10)")
+	// return ret
+	return true
+}
+
+//Tag:11
+func triggerNodeRemovalSelf() {
+	fmt.Println("<>Inside triggerNodeRemoval funtion(11)")
+	fmt.Println("11----Signal catched @shutdwon of service.Device removed fron current p2p cluster.Delete from nodeConnenctionMap")
+	//TODO. I have to identify self ID in this map for using this.
+	//lastDigittemp, _ := strconv.Atoi(nodeConnectionMap[mapKey].HardwareID)
+	//delete(nodeConnectionMap, mapKey)
+	//fmt.Printf("11----Node Map:%v\n", nodeConnectionMap)
+	//lastDigittemp %= 10
+	//fmt.Println("11----Last Digit:", lastDigittemp)
+
+	lastDigittemp := lastDigit
+	//Diconnected node may have multiple apps,so scan whole map
+	for key, v := range redundantDeploymentMap {
+		fmt.Printf("11----%s==>%016b\n", key, v)
+		statebittemp := lastDigittemp + 8
+		c1 := v & (1 << lastDigittemp)
+		c2 := v & (1 << statebittemp)
+		fmt.Println("11----c1:", c1, "---c2", c2)
+		if c1 > 0 && c2 == 0 { //Passive
+			fmt.Println("11----Passive Case:")
+			v = v &^ (1 << lastDigittemp)
+			redundantDeploymentMap[key] = v
+			fmt.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
+			break
+		} else if c1 > 0 && c2 > 1 { //Active
+			fmt.Println("11----Active Case:")
+			v = v &^ (1 << lastDigittemp)
+			v = v &^ (1 << statebittemp)
+			vv := v
+			fmt.Printf("11----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
+			for i := 0; i < 8; i++ {
+				if vv&1 == 1 {
+					statebit := i + 8
+					v = v | (1 << statebit)
+				}
+				vv = vv >> 1
+			}
+			redundantDeploymentMap[key] = v
+			fmt.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
+			break
+		}
 	}
-	fmt.Println("10----Return value from pingtest:", ret)
-	Info.Println("<>Leaving pingtest funtion(10)")
-	return ret
+	updateRedundantDeploymentMap()
+	fmt.Println("<>Leaving triggerNodeRemoval funtion(11)")
 }
