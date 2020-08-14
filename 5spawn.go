@@ -369,7 +369,32 @@ func main() {
 	var err error
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGSEGV, syscall.SIGABRT)
+	//var timeCount time.Duration
+	//Check for the status of service
+	/* cmd := exec.Command("/usr/bin/systemctl", "check", "syncthing@root")
+	for {
+		i := 1
+		time.Sleep(1 * time.Second)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				fmt.Printf("Count %d:Service status is Inactive.Systemctl finished with non zero:%v\n", i, exitErr)
+			} else {
+				fmt.Printf("Count %d:Service status is Inactive.Failed to run systemctl:%v\n", i, err)
+			}
+			i++
+			//os.Exit(1)
+		}
 
+		if err == nil {
+			fmt.Println("Service status is:", string(output))
+			break
+		}
+		//timeCount++
+	}
+	*/
+
+	time.Sleep(5 * time.Second)
 	//Initialize redundantDeploymentMap.json file if absent
 	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
 		fmt.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
@@ -567,10 +592,13 @@ func main() {
 	}
 
 	req.Header.Set("X-API-Key", "manjeettest")
+TRY1:
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println("*G4---Error reading config response.", err)
-		os.Exit(1)
+		time.Sleep(1 * time.Second)
+		goto TRY1
+		//os.Exit(1)
 	} else {
 		fmt.Println("G4----Server is up & running.")
 
@@ -596,10 +624,13 @@ func main() {
 		}
 
 		req.Header.Set("X-API-Key", "manjeettest")
+	TRY2:
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println("*G4---Error reading Connections response.", err)
-			os.Exit(1)
+			time.Sleep(1 * time.Second)
+			goto TRY2
+			//os.Exit(1)
 		} else {
 			if resp.Body != nil {
 				defer resp.Body.Close()
