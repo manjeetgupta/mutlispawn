@@ -193,9 +193,10 @@ type connections struct {
 
 //---------------------------------------------------------------------------------
 type nodeData struct {
-	HardwareID string
-	GloabalID  int
-	Address    string
+	HardwareID       string //Device name
+	GloabalID        int
+	Address          string
+	ConnectionStatus bool
 }
 
 // A EventConnect Struct

@@ -50,8 +50,7 @@ func init() {
 	}
 
 	// file can be replaced with os.Stdout or os.Stderr)
-
-	Info = log.New(file,
+	Info = log.New(os.Stdout,
 		"INFO: ",
 		log.Ldate|log.Ltime|log.Llongfile)
 
@@ -66,7 +65,6 @@ func init() {
 
 //Tag:9
 func readRedundantDeploymentMapFile() {
-
 	Info.Println("<>Inside readRedundantDeploymentMapFile funtion(9)")
 	jsonFile, err := os.Open("redundantDeploymentMap.json")
 	defer jsonFile.Close()
@@ -80,7 +78,7 @@ func readRedundantDeploymentMapFile() {
 			Error.Println("9*---Unmarshalling error:", err)
 			return
 		}
-		fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+		Info.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
 	}
 	Info.Println("<>Leaving readRedundantDeploymentMapFile funtion(9)")
 }
@@ -108,7 +106,6 @@ func readClientStateMapFile() {
 //Tag:7
 func initializeRedundantDeploymentMap() {
 	Info.Println("<>Inside initializeRedundantDeploymentMap funtion(7)")
-
 	jsonString, err := json.Marshal(redundantDeploymentMap)
 	if err != nil {
 		Error.Println("7*---Marshall()", err)
@@ -137,10 +134,7 @@ func initializeRedundantDeploymentMap() {
 
 //Tag:6
 func updateRedundantDeploymentMap() {
-
 	Info.Println("<>Inside updateRedundantDeploymentMap funtion(6)")
-
-	//f, err := os.OpenFile("redundantDeploymentMap.json", os.O_RDWR, 0777)
 	f, err := os.Create("redundantDeploymentMap.json")
 	defer f.Close()
 	if err != nil {
@@ -153,7 +147,7 @@ func updateRedundantDeploymentMap() {
 		Error.Println("6*---Marshall()", err)
 		return
 	}
-	fmt.Println("6----Marshalled Map going to be saved in redundantDeploymentMap.json:", string(jsonString))
+	Info.Println("6----Marshalled Map going to be saved in redundantDeploymentMap.json:", string(jsonString))
 
 	l, err := f.WriteString(string(jsonString))
 	if err != nil {
@@ -173,7 +167,6 @@ func updateRedundantDeploymentMap() {
 
 //Tag:5
 func readXML(filename string) appList {
-
 	Info.Println("<>Inside readXML funtion(5)")
 	xmlFile, err := os.Open(filename)
 	if err != nil {
@@ -188,19 +181,19 @@ func readXML(filename string) appList {
 	var deploymentFileContent appList
 	xml.Unmarshal(byteValue, &deploymentFileContent)
 
-	/*
-		for i := 0; i < len(deploymentFileContent.App); i++ {
-			Info.Println("Entry: ", i)
-			Info.Println("Csci_name: ", deploymentFileContent.App[i].CsciName)
-			Info.Println("Airbase_id: ", deploymentFileContent.App[i].AirbaseID)
-			Info.Println("Hardware_id: ", deploymentFileContent.App[i].HardwareID)
-			Info.Println("Hardware_type: ", deploymentFileContent.App[i].HardwareType)
-			Info.Println("Csci_id: ", deploymentFileContent.App[i].CsciID)
-			Info.Println("Max_retries: ", deploymentFileContent.App[i].MaxRetries)
-			Info.Println("Redundant: ", deploymentFileContent.App[i].Redundant)
-			Info.Println("List_of_arguments: ", deploymentFileContent.App[i].ListOfArguments)
-			Info.Println("--------------------------------------------")
-		}
+	/* // Print the contents of Deployment xml.
+	for i := 0; i < len(deploymentFileContent.App); i++ {
+		Info.Println("Entry: ", i)
+		Info.Println("Csci_name: ", deploymentFileContent.App[i].CsciName)
+		Info.Println("Airbase_id: ", deploymentFileContent.App[i].AirbaseID)
+		Info.Println("Hardware_id: ", deploymentFileContent.App[i].HardwareID)
+		Info.Println("Hardware_type: ", deploymentFileContent.App[i].HardwareType)
+		Info.Println("Csci_id: ", deploymentFileContent.App[i].CsciID)
+		Info.Println("Max_retries: ", deploymentFileContent.App[i].MaxRetries)
+		Info.Println("Redundant: ", deploymentFileContent.App[i].Redundant)
+		Info.Println("List_of_arguments: ", deploymentFileContent.App[i].ListOfArguments)
+		Info.Println("--------------------------------------------")
+	}
 	*/
 	Info.Println("<>Leaving readXML funtion(5)")
 	return deploymentFileContent
@@ -208,7 +201,6 @@ func readXML(filename string) appList {
 
 //Tag:4
 func isPid(pid int) bool {
-
 	Info.Println("<>Inside isPid funtion(4)")
 
 	if pid <= 0 {
@@ -247,7 +239,6 @@ func isPid(pid int) bool {
 
 //Tag:3
 func storeMap(applicaitonpidStateMap map[string]pidState) {
-
 	Info.Println("<>Inside storeMap funtion(3)")
 	f, err := os.Create(stateFileName)
 	defer f.Close()
@@ -301,9 +292,9 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 	// Update the redundantDeploymentMap, if flag is true...from 2 places..on active crash with multiple ...on intialization
 	if flag {
 		if v, found := redundantDeploymentMap[name]; found {
-			fmt.Printf("2----%s state before in redundantDeploymentMap :%016b\n", name, v)
+			Info.Printf("2----%s state before in redundantDeploymentMap :%016b\n", name, v)
 			if v&(1<<lastDigit) == 0 { //Initialization
-				fmt.Println("2----Initializaton case :")
+				Info.Println("2----Initializaton case :")
 				v = v | (1 << lastDigit)
 				//is there active in the system
 				if v&65280 == 0 {
@@ -313,14 +304,14 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 					//update map
 				}
 			} else { //on crash active multiple instance
-				fmt.Println("2----Active crash multiple instance case :")
+				Info.Println("2----Active crash multiple instance case :")
 				//v = v | 1<<lastDigit
 				statebit := lastDigit + 8
 				v = v & ^(1 << statebit)
 				//Find 1 in other half except lastDigit.
 				vv := v
 				vv = vv &^ (1 << lastDigit)
-				fmt.Printf("2----%s state before searching for other node in redundantDeploymentMap :%016b\n", name, vv)
+				Info.Printf("2----%s state before searching for other node in redundantDeploymentMap :%016b\n", name, vv)
 				for i := 0; i < 8; i++ {
 					if vv&1 == 1 {
 						statebit = i + 8
@@ -333,26 +324,26 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 
 			redundantDeploymentMap[name] = v
 			v, _ := redundantDeploymentMap[name]
-			fmt.Printf("2----%s state after spawning in redundantDeploymentMap :%016b\n", name, v)
+			Info.Printf("2----%s state after spawning in redundantDeploymentMap :%016b\n", name, v)
 		}
 		updateRedundantDeploymentMap()
 	}
 
 	wg.Add(1)
+
 	//Tag:G1
 	go func() {
-		fmt.Println("G1----Waiting for", cmd.Process.Pid)
+		Info.Println("G1----Waiting for", cmd.Process.Pid)
 		cmd.Wait()
 		defer wg.Done()
 		if _, found := runtimedeploymentMap[cmd.Process.Pid]; found { //if not checked then both will waits ( line 322 and this one)
-			fmt.Println("G1----Pid present in runtimedeploymentMap,so writing to channel")
+			Info.Println("G1----Pid present in runtimedeploymentMap,so writing to channel")
 			ch <- cmd.Process.Pid
 		}
 	}()
 
 	Info.Println("<>Leaving spawnApp funtion(2)")
 	return ch, nil
-
 }
 
 //Tag:1
@@ -369,35 +360,14 @@ func main() {
 	var err error
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGSEGV, syscall.SIGABRT)
-	//var timeCount time.Duration
-	//Check for the status of service
-	/* cmd := exec.Command("/usr/bin/systemctl", "check", "syncthing@root")
-	for {
-		i := 1
-		time.Sleep(1 * time.Second)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				fmt.Printf("Count %d:Service status is Inactive.Systemctl finished with non zero:%v\n", i, exitErr)
-			} else {
-				fmt.Printf("Count %d:Service status is Inactive.Failed to run systemctl:%v\n", i, err)
-			}
-			i++
-			//os.Exit(1)
-		}
 
-		if err == nil {
-			fmt.Println("Service status is:", string(output))
-			break
-		}
-		//timeCount++
-	}
-	*/
-
+	//Sleep to tune up the sync service
+	Info.Println("1----Waiting for service to tune in.....")
 	time.Sleep(5 * time.Second)
+
 	//Initialize redundantDeploymentMap.json file if absent
 	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
-		fmt.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
+		Info.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
 		for i := 0; i < len(deploymentFileContent.App); i++ {
 			if deploymentFileContent.App[i].Redundant {
 				redundantDeploymentMap[deploymentFileContent.App[i].CsciName] = 0
@@ -405,6 +375,7 @@ func main() {
 		}
 		initializeRedundantDeploymentMap()
 	}
+
 	//Creating Deployment map
 	for i := 0; i < len(deploymentFileContent.App); i++ {
 		//Generate key
@@ -415,11 +386,11 @@ func main() {
 			combinedKey := strconv.Itoa(deploymentFileContent.App[i].AirbaseID) + hw
 			value, ok := deploymentConfigurationMap[combinedKey]
 			if ok == true {
-				//Info.Println("1----",combinedKey,":key already present in map")
+				//Info.Println("1----", combinedKey, ":key already present in map")
 				value = append(value, deploymentFileContent.App[i])
 				deploymentConfigurationMap[combinedKey] = value
 			} else {
-				//Info.Println("1----",combinedKey,":new key")
+				//Info.Println("1----", combinedKey, ":new key")
 				var value []appDetail
 				value = append(value, deploymentFileContent.App[i])
 				deploymentConfigurationMap[combinedKey] = value
@@ -471,7 +442,6 @@ func main() {
 				Error.Println("1*---CoreDump after PtraceAttach")
 			}
 			if ws.Stopped() {
-				//time.Sleep(10 * time.Millisecond)
 				Info.Println("1----Stop signal after PtraceAttach : ", ws.StopSignal())
 				err = syscall.PtraceCont(pidState.Pid, 0)
 				if err != nil {
@@ -499,15 +469,16 @@ func main() {
 				if ws.Stopped() {
 					Error.Println("1*---Stopped after PtraceCont")
 				}
+
 				//Tag:G2
 				go func() {
 					var ws syscall.WaitStatus
 					wpid, err := syscall.Wait4(-1, &ws, syscall.WSTOPPED, nil) // -1 indicates that wait for all children
 					if wpid == -1 {
-						fmt.Println("G2*---Error wait4() = -1 :", err, ws)
+						Error.Println("G2*---Error wait4() = -1 :", err, ws)
 					}
 					if _, found := runtimedeploymentMap[wpid]; found { //if not checked then both will waits ( line 181 and this one)
-						fmt.Println("G2----Pid present in runtimedeploymentMap,so writing to channel")
+						Error.Println("G2----Pid present in runtimedeploymentMap,so writing to channel")
 						syscall.Kill(wpid, syscall.SIGKILL)
 						ch <- wpid
 					}
@@ -528,6 +499,114 @@ func main() {
 		}
 
 	}
+
+	//Tag:G3
+	go func() {
+		wg.Wait() //Wait  for sync group
+		//close(ch)
+	}()
+
+	//Retrieving information from SYNC to create map
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/config", nil)
+	if err != nil {
+		Error.Println("*G4---Error creating Config request", err)
+	}
+
+	req.Header.Set("X-API-Key", "manjeettest")
+TRY1:
+	resp, err := client.Do(req)
+	if err != nil {
+		Error.Println("*G4---Error reading config response.", err)
+		time.Sleep(3 * time.Second)
+		goto TRY1
+
+	} else {
+		Info.Println("G4----Server is up & running.")
+
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
+		responseBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Error.Println("*G4---Error Reading config response body", err)
+		}
+
+		var configResponse AutoGeneratedConfig
+		json.Unmarshal(responseBody, &configResponse)
+		//Info.Println("G4----Response recieved for Config:", string(responseBody))
+
+		//Retrieve Device ID and Device Name from config
+		for i := 0; i < len(configResponse.Devices); i++ {
+			Info.Println("G4----Device ID:", configResponse.Devices[i].DeviceID, "Device Name:", configResponse.Devices[i].Name)
+		}
+
+		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/connections", nil)
+		if err != nil {
+			Error.Println("*G4---Error creating Connections request", err)
+		}
+
+		req.Header.Set("X-API-Key", "manjeettest")
+	TRY2:
+		resp, err := client.Do(req)
+		if err != nil {
+			Error.Println("*G4---Error reading Connections response", err)
+			time.Sleep(3 * time.Second)
+			goto TRY2
+		} else {
+			if resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			responseBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				Error.Println("*G4---Error Reading Connections response body", err)
+			}
+			//Info.Println("G4----Response recieved for Connections:", string(responseBody))
+
+			var result map[string]interface{}
+			json.Unmarshal(responseBody, &result)
+			responseConnectionMap := result["connections"].(map[string]interface{})
+			//Info.Println("G4----Connections Key inside respose object:==>\n", responseConnectionMap)
+
+			//convert response to map
+			var connectionPartOnly = map[string]connections{}
+			//k=deviceID and v = map of connections type
+			for k, v := range responseConnectionMap {
+				//fmt.Println("type of value k", reflect.TypeOf(k))
+				//fmt.Println("type of value v", reflect.TypeOf(v))
+				jsonstringtemp, _ := json.Marshal(v) //convert map to json
+				c := connections{}
+				json.Unmarshal(jsonstringtemp, &c) //convert json to struct
+				connectionPartOnly[k] = c
+			}
+			//Retrieve Connection status and Addreess for given Device ID from connnections
+			for k, v := range connectionPartOnly {
+				Info.Println("G4----Device ID:", k, "Connected:", v.Connected, "Address:", v.Address)
+			}
+		}
+
+		chStartFileNotifier <- true
+		chStartStateResponder <- true
+	}
+
+	//This should become active only after Initialzaton is complete and sync is running.
+	go fileChangeNotifier()
+
+	go stateResponder()
+
+	go nodeConnectionNotifier()
+
+	//go nodeDisconnectionNotifier()
+
+	//Graceful exit
+	//Tag:G8
+	go func() {
+		sig := <-sigs
+		Info.Println("G8----Graceful exit started:", sig)
+		Info.Println("G8----Node removal triggered:")
+		triggerNodeRemovalSelf()
+		os.Exit(0)
+	}()
 
 	//Spawning of applicatons
 	Info.Println("1----Spawning of applicatons after reparenting check")
@@ -553,129 +632,6 @@ func main() {
 		Info.Println("1----No new application to spawn")
 	}
 
-	//Tag:G8
-	go func() {
-		sig := <-sigs
-		fmt.Println("G8----Graceful Exit:", sig)
-
-		fmt.Println("G8----Node removal triggered:")
-		triggerNodeRemovalSelf()
-
-		// client := &http.Client{}
-		// req, err := http.NewRequest("POST", "http://localhost:8384/rest/system/shutdown", nil)
-		// if err != nil {
-		// 	fmt.Println("*G8---Error Creating request", err)
-		// }
-		// req.Header.Set("X-API-Key", "manjeettest")
-		// _, err = client.Do(req)
-		// if err != nil {
-		// 	fmt.Println("*G8---Error Reading response.", err)
-		// }
-
-		// cmd := exec.Command("/usr/bin/pkill", "syncthing")
-		// err = cmd.Run()
-		// fmt.Printf("G8----Syncthing exited with error: %v\n", err)
-		os.Exit(0)
-	}()
-
-	//Wait  for sync group
-	//Tag:G3
-	go func() {
-		wg.Wait()
-		//close(ch)
-	}()
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/config", nil)
-	if err != nil {
-		fmt.Println("*G4---Error creating Config request", err)
-	}
-
-	req.Header.Set("X-API-Key", "manjeettest")
-TRY1:
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("*G4---Error reading config response.", err)
-		time.Sleep(1 * time.Second)
-		goto TRY1
-		//os.Exit(1)
-	} else {
-		fmt.Println("G4----Server is up & running.")
-
-		if resp.Body != nil {
-			defer resp.Body.Close()
-		}
-		responseBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("*G4---Error Reading config response body", err)
-		}
-
-		var configResponse AutoGeneratedConfig
-		json.Unmarshal(responseBody, &configResponse)
-		//fmt.Println("G4----Response recieved for Config:", string(responseBody))
-
-		for i := 0; i < len(configResponse.Devices); i++ {
-			fmt.Println("G4----Device ID:", configResponse.Devices[i].DeviceID, "Device Name:", configResponse.Devices[i].Name)
-		}
-		//New request for connections
-		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/connections", nil)
-		if err != nil {
-			fmt.Println("*G4---Error creating Connections request", err)
-		}
-
-		req.Header.Set("X-API-Key", "manjeettest")
-	TRY2:
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("*G4---Error reading Connections response.", err)
-			time.Sleep(1 * time.Second)
-			goto TRY2
-			//os.Exit(1)
-		} else {
-			if resp.Body != nil {
-				defer resp.Body.Close()
-			}
-			responseBody, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				fmt.Println("*G4---Error Reading Connections response body", err)
-			}
-			//fmt.Println("G4----Response recieved for Connections:", string(responseBody))
-
-			var result map[string]interface{}
-			json.Unmarshal(responseBody, &result)
-			responseConnectionMap := result["connections"].(map[string]interface{})
-			//fmt.Println("G4----Connections Key inside respose object:==>\n", responseConnectionMap)
-
-			//convert response to map
-			var connectionPartOnly = map[string]connections{}
-			//k=deviceID and v = map
-			for k, v := range responseConnectionMap {
-				//fmt.Println("type of value k", reflect.TypeOf(k))
-				//fmt.Println("type of value v", reflect.TypeOf(v))
-				jsonstringtemp, _ := json.Marshal(v) //convert map to json
-				c := connections{}
-				json.Unmarshal(jsonstringtemp, &c) //convert json to struct
-				connectionPartOnly[k] = c
-			}
-			for k, v := range connectionPartOnly {
-				fmt.Println("G4----Device ID:", k, "Connected:", v.Connected)
-			}
-
-		}
-
-		chStartFileNotifier <- true
-		chStartStateResponder <- true
-	}
-
-	//This should become active only after Initialzaton is complete and sync is running.
-	go fileChangeNotifier()
-
-	go stateResponder()
-
-	go nodeConnectionNotifier()
-
-	go nodeDisconnectionNotifier()
-
 	//Infinite loop to read from channel
 	for {
 		elem, ok := <-ch
@@ -695,14 +651,14 @@ TRY1:
 				jsonFile, err := os.Open("redundantDeploymentMap.json")
 				defer jsonFile.Close()
 				if err != nil {
-					fmt.Println("1*---Inside crash:", err)
+					Error.Println("1*---Inside crash:", err)
 				} else { //Read redunadant.json
 					jsonString, _ := ioutil.ReadAll(jsonFile)
 					err = json.Unmarshal(jsonString, &redundantDeploymentMap)
 					if err != nil {
-						fmt.Println("1*---Inside crash:Unmarshalling error:", err)
+						Error.Println("1*---Inside crash:Unmarshalling error:", err)
 					}
-					fmt.Printf("1----Inside crash:Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+					Info.Printf("1----Inside crash:Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
 				}
 
 				if v, found := redundantDeploymentMap[nameTemp]; found {
@@ -713,7 +669,7 @@ TRY1:
 					statebit := lastDigit + 8
 
 					if v&(1<<statebit) == 0 {
-						fmt.Println("1----Inside crash:Passive instance crashed")
+						Info.Println("1----Inside crash:Passive instance crashed")
 						ch, err = spawnApp(nameTemp, argTemp, false, true)
 					} else {
 
@@ -723,10 +679,10 @@ TRY1:
 						vv = vv &^ (1 << statebit)
 
 						if vv == 0 {
-							fmt.Println("1----Inside crash:Active instance crashed, Single Instance")
+							Info.Println("1----Inside crash:Active instance crashed, Single Instance")
 							ch, err = spawnApp(nameTemp, argTemp, false, true)
 						} else {
-							fmt.Println("1----Inside crash:Active instance crashed, Multiple Instance")
+							Info.Println("1----Inside crash:Active instance crashed, Multiple Instance")
 							ch, err = spawnApp(nameTemp, argTemp, true, true)
 						}
 
@@ -740,11 +696,11 @@ TRY1:
 			}
 		}
 	}
-}
+} //END of MAIN
 
 //Tag:G4
 func fileChangeNotifier() {
-	fmt.Println("<>Inside fileChangeNotifier funtion(G4)")
+	Info.Println("<>Inside fileChangeNotifier funtion(G4)")
 
 	var mostRecentID int
 	var mostRecentIDstr string
@@ -756,7 +712,7 @@ func fileChangeNotifier() {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
 			if err != nil {
-				fmt.Println("*G4---Error Creating request", err)
+				Error.Println("*G4---Error Creating request", err)
 			}
 
 			req.Header.Set("X-API-Key", "manjeettest")
@@ -767,7 +723,7 @@ func fileChangeNotifier() {
 
 			resp, err := client.Do(req)
 			if err != nil {
-				fmt.Println("*G4---Error Reading response.", err)
+				Error.Println("*G4---Error Reading response.", err)
 			}
 
 			if resp.Body != nil {
@@ -776,18 +732,18 @@ func fileChangeNotifier() {
 
 			responseBody, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				fmt.Println("*G4---Error Reading body", err)
+				Error.Println("*G4---Error Reading body", err)
 			}
 
 			var responseObject Event
 			json.Unmarshal(responseBody, &responseObject)
-			fmt.Println("G4----Response recieved:", string(responseBody))
-			fmt.Println("G4----Length of response:", len(responseObject))
+			Info.Println("G4----Response recieved:", string(responseBody))
+			Info.Println("G4----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
 				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
 				for i := 0; i < len(responseObject); i++ {
-					fmt.Println("G4---ID:", responseObject[i].SubscriptionID)
+					Info.Println("G4---ID:", responseObject[i].SubscriptionID)
 					// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
 					// 	fmt.Println("Time:", responseObject[i].Time)
 					// 	fmt.Println("Type:", responseObject[i].Type)
@@ -805,14 +761,13 @@ func fileChangeNotifier() {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	fmt.Println("<>Leaving fileChangeNotifier funtion(G4)")
+	Info.Println("<>Leaving fileChangeNotifier funtion(G4)")
 }
 
 //Tag:G5
 func stateResponder() {
-	fmt.Println("<>Inside stateResponder funtion(G4)")
+	Info.Println("<>Inside stateResponder funtion(G4)")
 	startFor := <-chStartStateResponder
-	//fmt.Println("G5----startFor recieved:", startFor)
 	if startFor {
 
 		http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
@@ -823,25 +778,25 @@ func stateResponder() {
 			keys, ok := req.URL.Query()["name"]
 
 			if !ok || len(keys[0]) < 1 {
-				fmt.Println("*G5---Url Param 'name' is missing")
+				Error.Println("*G5---Url Param 'name' is missing")
 				return
 			}
 
 			key := keys[0]
-			fmt.Println("G5----State requested for : " + string(key))
-			//Get the state from json.
+			Info.Println("G5----State requested for : " + string(key))
+			//Retrive the state from json.
 			readRedundantDeploymentMapFile()
 
 			if v, found := redundantDeploymentMap[key]; found {
-				fmt.Printf("G5----%s State present in redundantDeploymentMap :%016b\n", key, v)
+				Info.Printf("G5----%s State present in redundantDeploymentMap :%016b\n", key, v)
 				//vv := string(v)
 				statebit := lastDigit + 8
 				//fmt.Println("G3statebit==", statebit)
 				if v&(1<<statebit) == 0 {
-					fmt.Println("G5----Server replied 0")
+					Info.Println("G5----Server replied 0")
 					fmt.Fprint(res, "0")
 				} else {
-					fmt.Println("G5----Server replied 1")
+					Info.Println("G5----Server replied 1")
 					fmt.Fprint(res, "1")
 				}
 
@@ -851,12 +806,13 @@ func stateResponder() {
 
 		http.ListenAndServe(":9000", nil)
 	}
-	fmt.Println("<>Leaving stateResponder funtion(G5)")
+	Info.Println("<>Leaving stateResponder funtion(G5)")
 }
 
+/*
 //Tag:G6
 func nodeDisconnectionNotifier() {
-	fmt.Println("<>Inside nodeDisconnectionNotifier funtion(G6)")
+	Info.Println("<>Inside nodeDisconnectionNotifier funtion(G6)")
 	time.Sleep(5 * time.Second)
 	var mostRecentID int
 	var mostRecentIDstr string
@@ -961,24 +917,24 @@ func nodeDisconnectionNotifier() {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	fmt.Println("<>Leaving nodeDisconnectionNotifier funtion(G6)")
+	Info.Println("<>Leaving nodeDisconnectionNotifier funtion(G6)")
 }
+*/
 
 //Tag:G7
 func nodeConnectionNotifier() {
-	fmt.Println("<>Inside nodeConnectionNotifier funtion(G7)")
+	Info.Println("<>Inside nodeConnectionNotifier funtion(G7)")
 
 	var mostRecentID int
 	var mostRecentIDstr string
 
 	startFor := true
-	//fmt.Println("G7----startFor recieved:", startFor)
 	if startFor {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=DeviceConnected", nil)
 			if err != nil {
-				fmt.Println("*G7---Error Reading request", err)
+				Error.Println("*G7---Error Reading request", err)
 			}
 
 			req.Header.Set("X-API-Key", "manjeettest")
@@ -989,7 +945,7 @@ func nodeConnectionNotifier() {
 
 			resp, err := client.Do(req)
 			if err != nil {
-				fmt.Println("*G7---Error Reading response", err)
+				Error.Println("*G7---Error Reading response", err)
 			}
 
 			if resp.Body != nil {
@@ -998,23 +954,23 @@ func nodeConnectionNotifier() {
 
 			responseBody, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				fmt.Println("*G7---Error Reading body", err)
+				Error.Println("*G7---Error Reading body", err)
 			}
 
 			var responseObject EventConnect
 			json.Unmarshal(responseBody, &responseObject)
-			fmt.Println("G7----Response recieved:", string(responseBody))
+			Info.Println("G7----Response recieved:", string(responseBody))
 			//fmt.Println("G7----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
 				for i := 0; i < len(responseObject); i++ {
-					mapKey := responseObject[i].Data.ID
+					mapKey := responseObject[i].Data.ID               //ID=DeviceID
 					if d, found := nodeConnectionMap[mapKey]; found { //update only ID
-						fmt.Println("G7----Exiting Node Update")
+						Info.Println("G7----Exiting Node Update")
 						d.GloabalID = responseObject[i].GlobalID
 						nodeConnectionMap[mapKey] = d
 					} else {
-						fmt.Println("G7----New Node Entry")
+						Info.Println("G7----New Node Entry")
 						tempaddr := strings.Split(responseObject[i].Data.Addr, ":")
 						nodeConnectionMap[mapKey] = nodeData{HardwareID: responseObject[i].Data.DeviceName,
 							GloabalID: responseObject[i].GlobalID,
@@ -1030,7 +986,7 @@ func nodeConnectionNotifier() {
 				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
 				mostRecentIDstr = strconv.Itoa(mostRecentID)
 			}
-			fmt.Printf("G7----Node Map:%v", nodeConnectionMap)
+			Info.Printf("G7----Node Map:%v", nodeConnectionMap)
 			//Print complete map
 			// for key, element := range nodeConnectionMap {
 			// 	fmt.Println("key:", key, "=>", element.HardwareID, element.GloabalID, element.Address)
@@ -1039,7 +995,7 @@ func nodeConnectionNotifier() {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	fmt.Println("<>Leaving nodeConnectionNotifier funtion(G7)")
+	Info.Println("<>Leaving nodeConnectionNotifier funtion(G7)")
 }
 
 //Tag:10
@@ -1072,35 +1028,29 @@ func pingtest(ipaddress string) bool {
 
 //Tag:11
 func triggerNodeRemovalSelf() {
-	fmt.Println("<>Inside triggerNodeRemoval funtion(11)")
-	fmt.Println("11----Signal catched @shutdwon of service.Device removed fron current p2p cluster.Delete from nodeConnenctionMap")
-	//TODO. I have to identify self ID in this map for using this.
-	//lastDigittemp, _ := strconv.Atoi(nodeConnectionMap[mapKey].HardwareID)
-	//delete(nodeConnectionMap, mapKey)
-	//fmt.Printf("11----Node Map:%v\n", nodeConnectionMap)
-	//lastDigittemp %= 10
-	//fmt.Println("11----Last Digit:", lastDigittemp)
+	Info.Println("<>Inside triggerNodeRemoval funtion(11)")
+	Info.Println("11----Signal catched @shutdwon of service.Device removed fron current p2p cluster.Delete from nodeConnenctionMap")
 
 	lastDigittemp := lastDigit
 	//Diconnected node may have multiple apps,so scan whole map
 	for key, v := range redundantDeploymentMap {
-		fmt.Printf("11----%s==>%016b\n", key, v)
+		Info.Printf("11----%s==>%016b\n", key, v)
 		statebittemp := lastDigittemp + 8
 		c1 := v & (1 << lastDigittemp)
 		c2 := v & (1 << statebittemp)
-		fmt.Println("11----c1:", c1, "---c2", c2)
+		//fmt.Println("11----c1:", c1, "---c2", c2)
 		if c1 > 0 && c2 == 0 { //Passive
-			fmt.Println("11----Passive Case:")
+			Info.Println("11----Passive Case:")
 			v = v &^ (1 << lastDigittemp)
 			redundantDeploymentMap[key] = v
-			fmt.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
+			Info.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
 			break
 		} else if c1 > 0 && c2 > 1 { //Active
-			fmt.Println("11----Active Case:")
+			Info.Println("11----Active Case:")
 			v = v &^ (1 << lastDigittemp)
 			v = v &^ (1 << statebittemp)
 			vv := v
-			fmt.Printf("11----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
+			Info.Printf("11----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
 			for i := 0; i < 8; i++ {
 				if vv&1 == 1 {
 					statebit := i + 8
@@ -1109,10 +1059,16 @@ func triggerNodeRemovalSelf() {
 				vv = vv >> 1
 			}
 			redundantDeploymentMap[key] = v
-			fmt.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
+			Info.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
 			break
 		}
 	}
 	updateRedundantDeploymentMap()
-	fmt.Println("<>Leaving triggerNodeRemoval funtion(11)")
+	Info.Println("<>Leaving triggerNodeRemoval funtion(11)")
+}
+
+//Tag:12
+func createNodeConnectionMap() {
+	Info.Println("<>Inside createNodeConnectionMap funtion(12)")
+	Info.Println("<>Leaving createNodeConnectionMap funtion(12)")
 }
