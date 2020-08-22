@@ -196,7 +196,8 @@ type nodeData struct {
 	HardwareID       string //Device name
 	GloabalID        int
 	Address          string
-	ConnectionStatus bool
+	ConnectionStatus int
+	//ReconnectFlag    bool
 }
 
 // A EventConnect Struct

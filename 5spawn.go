@@ -28,10 +28,14 @@ var ch = make(chan int, 5)
 var chStartFileNotifier = make(chan bool, 1)
 var chStartStateResponder = make(chan bool, 1)
 var chStartNodeDisconnectNotifier = make(chan bool, 1)
+var chStartNodeReConnectNotifier = make(chan int, 1)
 var wg sync.WaitGroup
 var stateFileName string
 var arg string
+var gatewayIP string
+var selfID string
 var lastDigit int
+var selfIsolationCount int
 
 var (
 	// Info    :  Special Information
@@ -44,6 +48,7 @@ var (
 
 func init() {
 	arg = os.Args[1]
+	gatewayIP = os.Args[2]
 	lastDigit, _ = strconv.Atoi(arg)
 	lastDigit = lastDigit % 10
 	logFileName := "amsm" + arg + ".log"
@@ -82,6 +87,7 @@ func readRedundantDeploymentMapFile() {
 			return
 		}
 		Info.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+		fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
 	}
 	Info.Println("<>Leaving readRedundantDeploymentMapFile funtion(9)")
 }
@@ -89,7 +95,7 @@ func readRedundantDeploymentMapFile() {
 //Tag:8
 func readClientStateMapFile() {
 	Info.Println("<>Inside readClientStateMapFile funtion(8)")
-	stateFileName = "ClientState" + arg + ".json"
+	stateFileName = "clientState" + arg + ".json"
 	jsonFile, err := os.Open(stateFileName)
 	defer jsonFile.Close()
 	if err != nil {
@@ -587,10 +593,7 @@ func main() {
 				}
 
 				if v, found := redundantDeploymentMap[nameTemp]; found {
-					fmt.Printf("1----Inside crash:%s state just after crash in redundantDeploymentMap :%016b\n", nameTemp, v)
-					//check its state bit in map
-					//if v & 1<<statebit !=0
-					// then it is set ...means active failed...else passive failed
+					Info.Printf("1----Inside crash:%s state just after crash in redundantDeploymentMap :%016b\n", nameTemp, v)
 					statebit := lastDigit + 8
 
 					if v&(1<<statebit) == 0 {
@@ -636,6 +639,7 @@ func fileChangeNotifier() {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
+			//req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=ItemFinished", nil)
 			if err != nil {
 				Error.Println("*G4---Error Creating request", err)
 			}
@@ -662,11 +666,56 @@ func fileChangeNotifier() {
 
 			var responseObject Event
 			json.Unmarshal(responseBody, &responseObject)
-			Info.Println("G4----Response recieved:", string(responseBody))
 			//Info.Println("G4----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
 				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
+				//Set its status bit whenever a node came after disconnection.
+				Info.Println("G4----Response recieved:", string(responseBody))
+				fmt.Println("G4----Redunadant map after RemoteChangeDetected event")
+				readRedundantDeploymentMapFile()
+
+				if selfIsolationCount > 0 {
+					selfIsolationCount = 0
+
+					fmt.Println("G4----Node has reconnected after disconnection")
+					go func() {
+						var exitLoop bool = false
+						for {
+							//Read connection map for connectionstatus of other nodes
+							for _, element := range nodeConnectionMap {
+								if element.Address != "SELF" && element.ConnectionStatus >= 7 {
+									for key, v := range redundantDeploymentMap {
+										c1 := v & (1 << lastDigit)
+										if c1 == 0 {
+											//Is key present in deployment map of this node
+											element := deploymentConfigurationMap["1"+arg]
+											for _, apptospawn := range element {
+												if key == apptospawn.CsciName {
+													fmt.Println("G4----Setting status bit after reconnection in the required application")
+													fmt.Printf("G4----%s Status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
+													v = v | (1 << lastDigit)
+													fmt.Printf("G4----%s Status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
+													redundantDeploymentMap[key] = v
+													updateRedundantDeploymentMap()
+													break
+												}
+											}
+										}
+									}
+									exitLoop = true
+								}
+							}
+
+							if exitLoop {
+								break
+							} else {
+								time.Sleep(1 * time.Second)
+							}
+						}
+					}()
+				}
+
 				for i := 0; i < len(responseObject); i++ {
 					//  fmt.Println("G4---ID:", responseObject[i].SubscriptionID)
 					// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
@@ -691,7 +740,7 @@ func fileChangeNotifier() {
 
 //Tag:G5
 func stateResponder() {
-	Info.Println("<>Inside stateResponder funtion(G4)")
+	Info.Println("<>Inside stateResponder funtion(G5)")
 	startFor := <-chStartStateResponder
 	if startFor {
 
@@ -738,58 +787,102 @@ func stateResponder() {
 func nodeDisconnectionNotifier() {
 	Info.Println("<>Inside nodeDisconnectionNotifier funtion(G6)")
 	startFor := <-chStartNodeDisconnectNotifier
-	if startFor { //Wait for trigger
-		for { //Inifinite while
-			for key, element := range nodeConnectionMap { //Iterate map every 8 sec
-				if element.ConnectionStatus {
-					pingresult := pingtest(element.Address)
-					if pingresult == false {
-						element.ConnectionStatus = false
-						nodeConnectionMap[key] = element
-						fmt.Println("G6----key:", key, "=>", element.HardwareID, element.Address)
-						fmt.Println("G6----Device disconecion is confirmed as PING failed:Delete from nodeConnenctionMap")
-						lastDigittemp, _ := strconv.Atoi(element.HardwareID)
-						//delete(nodeConnectionMap, mapKey)
-						fmt.Printf("G6----Node Map:%v\n", nodeConnectionMap)
-						lastDigittemp %= 10
-						fmt.Println("G6----Last Digit:", lastDigittemp)
+	ticker := time.NewTicker(10 * time.Second)
 
-						//Diconnected node may have multiple apps,so scan whole map
-						for key, v := range redundantDeploymentMap {
-							fmt.Printf("G6----%s==>%016b\n", key, v)
-							statebittemp := lastDigittemp + 8
-							c1 := v & (1 << lastDigittemp)
-							c2 := v & (1 << statebittemp)
-							fmt.Println("G6----c1:", c1, "---c2", c2)
-							if c1 > 0 && c2 == 0 { //Passive
-								fmt.Println("G6----Passive Case:")
-								v = v &^ (1 << lastDigittemp)
-								redundantDeploymentMap[key] = v
-								fmt.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
-								break
-							} else if c1 > 0 && c2 > 1 { //Active
-								fmt.Println("G6----Active Case:")
-								v = v &^ (1 << lastDigittemp)
-								v = v &^ (1 << statebittemp)
-								vv := v
-								fmt.Printf("G6----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
-								for i := 0; i < 8; i++ {
-									if vv&1 == 1 {
-										statebit := i + 8
-										v = v | (1 << statebit)
+	if startFor { //Wait for trigger
+		for _ = range ticker.C {
+			Info.Println("G6----Ticker entered")
+			for key, element := range nodeConnectionMap { //Iterate map every 10 sec
+				if element.Address != "SELF" {
+					//if element.ConnectionStatus {
+					Info.Println(element.HardwareID, " :Node Connection status:", element.ConnectionStatus)
+					pingresult := pingtest(element.Address)
+
+					if pingresult == false {
+						//Increment count and then reset (1-5)
+						element.ConnectionStatus++
+						if element.ConnectionStatus > 5 {
+							element.ConnectionStatus = 1
+						}
+						nodeConnectionMap[key] = element
+						Info.Println("G6----Checking with Gateway")
+						pingresult = pingtest(gatewayIP) //Check with Gateway
+						if pingresult == true {
+
+							Info.Println("G6----key:", key, "=>", element.HardwareID, element.Address)
+							Info.Println("G6----Device disconecion is confirmed as PING failed")
+
+							lastDigittemp, _ := strconv.Atoi(element.HardwareID)
+							//delete(nodeConnectionMap, mapKey)
+							Info.Printf("G6----Node Map:%v\n", nodeConnectionMap)
+							lastDigittemp %= 10
+							Info.Println("G6----Last Digit:", lastDigittemp)
+
+							//Diconnected node may have multiple apps,so scan whole map
+							for key, v := range redundantDeploymentMap {
+								Info.Printf("G6----%s==>%016b\n", key, v)
+								statebittemp := lastDigittemp + 8
+								c1 := v & (1 << lastDigittemp)
+								c2 := v & (1 << statebittemp)
+								//fmt.Println("G6----c1:", c1, "---c2", c2)
+								if c1 > 0 && c2 == 0 { //Passive
+									Info.Println("G6----Passive Case:")
+									v = v &^ (1 << lastDigittemp)
+									redundantDeploymentMap[key] = v
+									Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
+									//break
+								} else if c1 > 0 && c2 > 1 { //Active
+									Info.Println("G6----Active Case:")
+									v = v &^ (1 << lastDigittemp)
+									v = v &^ (1 << statebittemp)
+									vv := v
+									Info.Printf("G6----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
+									for i := 0; i < 8; i++ {
+										if vv&1 == 1 {
+											statebit := i + 8
+											v = v | (1 << statebit)
+										}
+										vv = vv >> 1
 									}
-									vv = vv >> 1
+									redundantDeploymentMap[key] = v
+									Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
+									//break
 								}
-								redundantDeploymentMap[key] = v
-								fmt.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
-								break
+							}
+							updateRedundantDeploymentMap()
+						} else {
+							Info.Printf("G6----This node has become self isolated:%d", selfIsolationCount)
+							selfIsolationCount++
+
+							//Turn itself into BLANK node
+							if selfIsolationCount == 1 { //For first time only
+								Info.Println("G6----Last Digit:", lastDigit)
+								for key, v := range redundantDeploymentMap {
+									Info.Printf("G6----%s==>%016b\n", key, v)
+									v = 0
+									Info.Printf("G6 after self-isolation----%s==>%016b\n", key, v)
+									redundantDeploymentMap[key] = v
+								}
+								updateRedundantDeploymentMap()
+								cmd := exec.Command("/usr/bin/touch", "redundantDeploymentMap.json", "-r", "5spawn")
+								err := cmd.Run()
+								if err != nil {
+									Error.Println("*G6----Error in touching the file:", err)
+								}
 							}
 						}
-						updateRedundantDeploymentMap()
+					} else {
+						//element.ConnectionStatus = true
+						//Increment count and then reset (6-10)
+						element.ConnectionStatus++
+						if element.ConnectionStatus > 10 {
+							element.ConnectionStatus = 6
+						}
+						nodeConnectionMap[key] = element
 					}
 				}
 			}
-			time.Sleep(8 * time.Second)
+			//time.Sleep(2 * time.Second)
 		}
 	}
 	Info.Println("<>Leaving nodeDisconnectionNotifier funtion(G6)")
@@ -798,7 +891,8 @@ func nodeDisconnectionNotifier() {
 //Tag:G7
 func nodeConnectionNotifier() {
 	Info.Println("<>Inside nodeConnectionNotifier funtion(G7)")
-
+	//Node connection event will not be recieved when cable is plugged out and then plugged in of any other node
+	//while SYNC service is running on both nodes
 	var mostRecentID int
 	var mostRecentIDstr string
 
@@ -833,32 +927,41 @@ func nodeConnectionNotifier() {
 
 			var responseObject EventConnect
 			json.Unmarshal(responseBody, &responseObject)
-			Info.Println("G7----Response recieved:", string(responseBody))
 			//fmt.Println("G7----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
+				Info.Println("G7----Response recieved:", string(responseBody))
 				for i := 0; i < len(responseObject); i++ {
 					mapKey := responseObject[i].Data.ID               //ID=DeviceID
 					if d, found := nodeConnectionMap[mapKey]; found { //update only ID
-						Info.Println("G7----Exiting Node Update")
+						Info.Println("G7----Existing Node Update")
+						//if d.GloabalID == -1 {
+						//d.ReconnectFlag = true
+						//}
 						d.GloabalID = responseObject[i].GlobalID
 						tempaddr := strings.Split(responseObject[i].Data.Addr, ":")
 						d.Address = tempaddr[0]
 						d.HardwareID = responseObject[i].Data.DeviceName
-						d.ConnectionStatus = true
+						lastDigitConnected, _ := strconv.Atoi(responseObject[i].Data.DeviceName)
+						lastDigitConnected = lastDigitConnected % 10
+						//d.ConnectionStatus = true
+						d.ConnectionStatus = 6
 						nodeConnectionMap[mapKey] = d
 					} else {
 						Info.Println("G7----New Node Entry")
 						tempaddr := strings.Split(responseObject[i].Data.Addr, ":")
 						nodeConnectionMap[mapKey] = nodeData{HardwareID: responseObject[i].Data.DeviceName,
 							GloabalID: responseObject[i].GlobalID,
-							Address:   tempaddr[0]}
+							Address:   tempaddr[0],
+							//ConnectionStatus: true}
+							ConnectionStatus: 6}
+						//ReconnectFlag:    true}
 					}
 					// fmt.Println("G7---ID:", responseObject[i].SubscriptionID)
 					// fmt.Println("GlobalID:", responseObject[i].GlobalID)
 					// fmt.Println("Time:", responseObject[i].Time)
 					// fmt.Println("G7---Type:", responseObject[i].Type)
-					// fmt.Println("G7---Data->ID:", responseObject[i].Data.ID)
+					// fmt.Println("G7---Data->ID:", responseObject[i].Data.ID)z
 					// fmt.Println("G7---Data->DeviceName:", responseObject[i].Data.DeviceName)
 				}
 				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
@@ -879,28 +982,27 @@ func nodeConnectionNotifier() {
 //Tag:10
 func pingtest(ipaddress string) bool {
 	Info.Println("<>Inside pingtest funtion(10)")
-	fmt.Println("10----Ping test on:", ipaddress)
 	var ret bool
 
 	pinger, err := ping.NewPinger(ipaddress)
 	if err != nil {
-		fmt.Println("10----Pinger creation error:", err)
+		Error.Println("*10----Pinger creation error:", err)
 		return true
 	}
-	pinger.Count = 3
-	pinger.Timeout = time.Second * 1
+	pinger.Count = 2
+	pinger.Timeout = time.Millisecond * 500
 	pinger.Interval = time.Millisecond * 333
 
 	pinger.Run()
 	stats := pinger.Statistics()
-	fmt.Println("10----Statistics", stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
+	//fmt.Println("10----Statistics", stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
 
 	if stats.PacketLoss > 0 {
 		ret = false
 	} else {
 		ret = true
 	}
-	fmt.Println("10----Return value from pingtest:", ret)
+	Info.Printf("10----Return value from pingtest on %v : %v", ipaddress, ret)
 	Info.Println("<>Leaving pingtest funtion(10)")
 	return ret
 }
@@ -923,7 +1025,7 @@ func triggerNodeRemovalSelf() {
 			v = v &^ (1 << lastDigittemp)
 			redundantDeploymentMap[key] = v
 			Info.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
-			break
+			//break
 		} else if c1 > 0 && c2 > 1 { //Active
 			Info.Println("11----Active Case:")
 			v = v &^ (1 << lastDigittemp)
@@ -939,7 +1041,7 @@ func triggerNodeRemovalSelf() {
 			}
 			redundantDeploymentMap[key] = v
 			Info.Printf("11----Bitmap after Change: %s==>%016b\n", key, v)
-			break
+			//break
 		}
 	}
 	updateRedundantDeploymentMap()
@@ -977,15 +1079,23 @@ TRY1:
 
 		var configResponse AutoGeneratedConfig
 		json.Unmarshal(responseBody, &configResponse)
-		//Info.Println("G4----Response recieved for Config:", string(responseBody))
+		//Info.Println("12----Response recieved for Config:", string(responseBody))
+
+		//Add Gateway in nodeConnection Map
+		nodeConnectionMap["GATEWAY"] = nodeData{HardwareID: "GATEWAY",
+			GloabalID:        -1,
+			Address:          gatewayIP,
+			ConnectionStatus: 6}
 
 		//Retrieve Device ID and Device Name from config
 		for i := 0; i < len(configResponse.Devices); i++ {
 			//Info.Println("12----Device ID:", configResponse.Devices[i].DeviceID, "Device Name:", configResponse.Devices[i].Name)
 			nodeConnectionMap[configResponse.Devices[i].DeviceID] = nodeData{HardwareID: configResponse.Devices[i].Name,
-				GloabalID:        -1,
-				Address:          "NIL",
-				ConnectionStatus: false}
+				GloabalID: -1,
+				Address:   "NIL",
+				//ConnectionStatus: false}
+				ConnectionStatus: 1}
+			//ReconnectFlag:    false}
 		}
 
 		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/connections", nil)
@@ -1029,11 +1139,21 @@ TRY1:
 			//Retrieve Connection status and Addreess for given Device ID from connnections
 			for k, v := range connectionPartOnly {
 				//Info.Println("12----Device ID:", k, "Connected:", v.Connected, "Address:", v.Address)
+				var ConnectionStatustmp int
+
+				if v.Connected == true {
+					ConnectionStatustmp = 6
+				} else {
+					ConnectionStatustmp = 1
+				}
 
 				if d, found := nodeConnectionMap[k]; found { //update connectionstatus and address
-					d.ConnectionStatus = v.Connected
+					//d.ConnectionStatus = v.Connected
+					d.ConnectionStatus = ConnectionStatustmp
+
 					if d.HardwareID == arg {
 						d.Address = "SELF"
+						selfID = k
 					} else {
 						tempaddr := strings.Split(v.Address, ":")
 						d.Address = tempaddr[0]
@@ -1044,7 +1164,8 @@ TRY1:
 					nodeConnectionMap[k] = nodeData{HardwareID: "NIL",
 						GloabalID:        -1,
 						Address:          tempaddr[0],
-						ConnectionStatus: v.Connected}
+						ConnectionStatus: ConnectionStatustmp}
+					//ReconnectFlag:    false}
 				}
 			}
 		}
