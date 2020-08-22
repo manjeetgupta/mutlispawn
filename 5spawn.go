@@ -634,7 +634,6 @@ func fileChangeNotifier() {
 	var mostRecentIDstr string
 
 	startFor := <-chStartFileNotifier
-	//fmt.Println("G4----startFor recieved:", startFor)
 	if startFor {
 		for {
 			client := &http.Client{}
@@ -671,8 +670,7 @@ func fileChangeNotifier() {
 			if len(responseObject) > 0 {
 				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
 				//Set its status bit whenever a node came after disconnection.
-				Info.Println("G4----Response recieved:", string(responseBody))
-				fmt.Println("G4----Redunadant map after RemoteChangeDetected event")
+				//Info.Println("G4----Response recieved:", string(responseBody))
 				readRedundantDeploymentMapFile()
 
 				if selfIsolationCount > 0 {
@@ -683,29 +681,31 @@ func fileChangeNotifier() {
 						var exitLoop bool = false
 						for {
 							//Read connection map for connectionstatus of other nodes
-							for _, element := range nodeConnectionMap {
-								if element.Address != "SELF" && element.ConnectionStatus >= 7 {
-									for key, v := range redundantDeploymentMap {
-										c1 := v & (1 << lastDigit)
-										if c1 == 0 {
-											//Is key present in deployment map of this node
-											element := deploymentConfigurationMap["1"+arg]
-											for _, apptospawn := range element {
-												if key == apptospawn.CsciName {
-													fmt.Println("G4----Setting status bit after reconnection in the required application")
-													fmt.Printf("G4----%s Status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
-													v = v | (1 << lastDigit)
-													fmt.Printf("G4----%s Status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
-													redundantDeploymentMap[key] = v
-													updateRedundantDeploymentMap()
-													break
-												}
+							d, _ := nodeConnectionMap["GATEWAY"] //update only status
+							Info.Println("G4----GATEWAY status:", d.ConnectionStatus)
+							//for _, element := range nodeConnectionMap {
+							if d.ConnectionStatus >= 7 {
+								for key, v := range redundantDeploymentMap {
+									c1 := v & (1 << lastDigit)
+									if c1 == 0 {
+										//Is key present in deployment map of this node
+										element := deploymentConfigurationMap["1"+arg]
+										for _, apptospawn := range element {
+											if key == apptospawn.CsciName {
+												fmt.Println("G4----Setting status bit after reconnection in this application:", key)
+												fmt.Printf("G4----%s Status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
+												v = v | (1 << lastDigit)
+												fmt.Printf("G4----%s Status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
+												redundantDeploymentMap[key] = v
+												updateRedundantDeploymentMap()
+												break
 											}
 										}
 									}
-									exitLoop = true
 								}
+								exitLoop = true
 							}
+							//}
 
 							if exitLoop {
 								break
@@ -752,7 +752,6 @@ func stateResponder() {
 				Info.Printf("G5----%s State present in redundantDeploymentMap :%016b\n", key, v)
 				//vv := string(v)
 				statebit := lastDigit + 8
-				//fmt.Println("G3statebit==", statebit)
 				if v&(1<<statebit) == 0 {
 					Info.Println("G5----Server replied 0")
 					fmt.Fprint(res, "0")
@@ -775,13 +774,10 @@ func nodeDisconnectionNotifier() {
 
 	if startFor { //Wait for trigger
 		for _ = range ticker.C {
-			Info.Println("G6----Ticker entered")
+			Info.Println("G6----Ticker entered:", nodeConnectionMap)
 			for key, element := range nodeConnectionMap { //Iterate map every 10 sec
 				if element.Address != "SELF" {
-					//if element.ConnectionStatus {
-					Info.Println(element.HardwareID, " :Node Connection status:", element.ConnectionStatus)
 					pingresult := pingtest(element.Address)
-
 					if pingresult == false {
 						//Increment count and then reset (1-5)
 						element.ConnectionStatus++
@@ -792,23 +788,18 @@ func nodeDisconnectionNotifier() {
 						Info.Println("G6----Checking with Gateway")
 						pingresult = pingtest(gatewayIP) //Check with Gateway
 						if pingresult == true {
-
-							Info.Println("G6----key:", key, "=>", element.HardwareID, element.Address)
-							Info.Println("G6----Device disconecion is confirmed as PING failed")
+							Info.Println("G6----key:", key, "=>", element.HardwareID, element.Address, ": Device disconnection confirmed")
 
 							lastDigittemp, _ := strconv.Atoi(element.HardwareID)
 							//delete(nodeConnectionMap, mapKey)
-							Info.Printf("G6----Node Map:%v\n", nodeConnectionMap)
 							lastDigittemp %= 10
-							Info.Println("G6----Last Digit:", lastDigittemp)
-
 							//Diconnected node may have multiple apps,so scan whole map
 							for key, v := range redundantDeploymentMap {
 								Info.Printf("G6----%s==>%016b\n", key, v)
 								statebittemp := lastDigittemp + 8
 								c1 := v & (1 << lastDigittemp)
 								c2 := v & (1 << statebittemp)
-								//fmt.Println("G6----c1:", c1, "---c2", c2)
+
 								if c1 > 0 && c2 == 0 { //Passive
 									Info.Println("G6----Passive Case:")
 									v = v &^ (1 << lastDigittemp)
@@ -838,6 +829,15 @@ func nodeDisconnectionNotifier() {
 							Info.Printf("G6----This node has become self isolated:%d", selfIsolationCount)
 							selfIsolationCount++
 
+							// if d, found := nodeConnectionMap["GATEWAY"]; found { //update only status
+							// 	Info.Println("GATEWAY:", d.ConnectionStatus)
+							// 	d.ConnectionStatus++
+							// 	if d.ConnectionStatus > 5 {
+							// 		d.ConnectionStatus = 1
+							// 	}
+							// 	nodeConnectionMap["GATEWAY"] = d
+							// }
+
 							//Turn itself into BLANK node
 							if selfIsolationCount == 1 { //For first time only
 								Info.Println("G6----Last Digit:", lastDigit)
@@ -862,6 +862,24 @@ func nodeDisconnectionNotifier() {
 							element.ConnectionStatus = 6
 						}
 						nodeConnectionMap[key] = element
+
+						// d, _ := nodeConnectionMap["GATEWAY"] //update only status
+						// Info.Println("GATEWAY:", d.ConnectionStatus)
+						// d.ConnectionStatus++
+						// if d.ConnectionStatus > 10 {
+						// 	d.ConnectionStatus = 6
+						// }
+						// nodeConnectionMap["GATEWAY"] = d
+
+						// if d, found := nodeConnectionMap["GATEWAY"]; found { //update only status
+						// 	Info.Println("GATEWAY:", d.ConnectionStatus)
+						// 	d.ConnectionStatus++
+						// 	if d.ConnectionStatus > 10 {
+						// 		d.ConnectionStatus = 6
+						// 	}
+						// 	nodeConnectionMap["GATEWAY"] = d
+						// }
+
 					}
 				}
 			}
@@ -912,7 +930,7 @@ func nodeConnectionNotifier() {
 			json.Unmarshal(responseBody, &responseObject)
 
 			if len(responseObject) > 0 {
-				Info.Println("G7----Response recieved:", string(responseBody))
+				//Info.Println("G7----Response recieved:", string(responseBody))
 				for i := 0; i < len(responseObject); i++ {
 					mapKey := responseObject[i].Data.ID               //ID=DeviceID
 					if d, found := nodeConnectionMap[mapKey]; found { //update only ID
@@ -989,7 +1007,7 @@ func triggerNodeRemovalSelf() {
 		statebittemp := lastDigittemp + 8
 		c1 := v & (1 << lastDigittemp)
 		c2 := v & (1 << statebittemp)
-		//fmt.Println("11----c1:", c1, "---c2", c2)
+
 		if c1 > 0 && c2 == 0 { //Passive
 			Info.Println("11----Passive Case:")
 			v = v &^ (1 << lastDigittemp)
