@@ -716,19 +716,6 @@ func fileChangeNotifier() {
 					}()
 				}
 
-				for i := 0; i < len(responseObject); i++ {
-					//  fmt.Println("G4---ID:", responseObject[i].SubscriptionID)
-					// 	fmt.Println("GlobalID:", responseObject[i].GlobalID)
-					// 	fmt.Println("Time:", responseObject[i].Time)
-					// 	fmt.Println("Type:", responseObject[i].Type)
-					// 	fmt.Println("Data->Action:", responseObject[i].Data.Action)
-					// 	fmt.Println("Data->Folder:", responseObject[i].Data.Folder)
-					// 	fmt.Println("Data->FolderID:", responseObject[i].Data.FolderID)
-					// 	fmt.Println("Data->Label:", responseObject[i].Data.Label)
-					//  fmt.Println("Data->ModifiedBy:", responseObject[i].Data.ModifiedBy)
-					// 	fmt.Println("Data->Path:", responseObject[i].Data.Path)
-					// 	fmt.Println("Data->Type:", responseObject[i].Data.Type)
-				}
 				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
 				mostRecentIDstr = strconv.Itoa(mostRecentID)
 			}
@@ -773,11 +760,8 @@ func stateResponder() {
 					Info.Println("G5----Server replied 1")
 					fmt.Fprint(res, "1")
 				}
-
 			}
-
 		})
-
 		http.ListenAndServe(":9000", nil)
 	}
 	Info.Println("<>Leaving stateResponder funtion(G5)")
@@ -872,7 +856,6 @@ func nodeDisconnectionNotifier() {
 							}
 						}
 					} else {
-						//element.ConnectionStatus = true
 						//Increment count and then reset (6-10)
 						element.ConnectionStatus++
 						if element.ConnectionStatus > 10 {
@@ -927,7 +910,6 @@ func nodeConnectionNotifier() {
 
 			var responseObject EventConnect
 			json.Unmarshal(responseBody, &responseObject)
-			//fmt.Println("G7----Length of response:", len(responseObject))
 
 			if len(responseObject) > 0 {
 				Info.Println("G7----Response recieved:", string(responseBody))
@@ -935,34 +917,22 @@ func nodeConnectionNotifier() {
 					mapKey := responseObject[i].Data.ID               //ID=DeviceID
 					if d, found := nodeConnectionMap[mapKey]; found { //update only ID
 						Info.Println("G7----Existing Node Update")
-						//if d.GloabalID == -1 {
-						//d.ReconnectFlag = true
-						//}
 						d.GloabalID = responseObject[i].GlobalID
 						tempaddr := strings.Split(responseObject[i].Data.Addr, ":")
 						d.Address = tempaddr[0]
 						d.HardwareID = responseObject[i].Data.DeviceName
 						lastDigitConnected, _ := strconv.Atoi(responseObject[i].Data.DeviceName)
 						lastDigitConnected = lastDigitConnected % 10
-						//d.ConnectionStatus = true
 						d.ConnectionStatus = 6
 						nodeConnectionMap[mapKey] = d
 					} else {
 						Info.Println("G7----New Node Entry")
 						tempaddr := strings.Split(responseObject[i].Data.Addr, ":")
 						nodeConnectionMap[mapKey] = nodeData{HardwareID: responseObject[i].Data.DeviceName,
-							GloabalID: responseObject[i].GlobalID,
-							Address:   tempaddr[0],
-							//ConnectionStatus: true}
+							GloabalID:        responseObject[i].GlobalID,
+							Address:          tempaddr[0],
 							ConnectionStatus: 6}
-						//ReconnectFlag:    true}
 					}
-					// fmt.Println("G7---ID:", responseObject[i].SubscriptionID)
-					// fmt.Println("GlobalID:", responseObject[i].GlobalID)
-					// fmt.Println("Time:", responseObject[i].Time)
-					// fmt.Println("G7---Type:", responseObject[i].Type)
-					// fmt.Println("G7---Data->ID:", responseObject[i].Data.ID)z
-					// fmt.Println("G7---Data->DeviceName:", responseObject[i].Data.DeviceName)
 				}
 				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
 				mostRecentIDstr = strconv.Itoa(mostRecentID)
@@ -1091,11 +1061,9 @@ TRY1:
 		for i := 0; i < len(configResponse.Devices); i++ {
 			//Info.Println("12----Device ID:", configResponse.Devices[i].DeviceID, "Device Name:", configResponse.Devices[i].Name)
 			nodeConnectionMap[configResponse.Devices[i].DeviceID] = nodeData{HardwareID: configResponse.Devices[i].Name,
-				GloabalID: -1,
-				Address:   "NIL",
-				//ConnectionStatus: false}
+				GloabalID:        -1,
+				Address:          "NIL",
 				ConnectionStatus: 1}
-			//ReconnectFlag:    false}
 		}
 
 		req, err := http.NewRequest("GET", "http://localhost:8384/rest/system/connections", nil)
@@ -1148,7 +1116,6 @@ TRY1:
 				}
 
 				if d, found := nodeConnectionMap[k]; found { //update connectionstatus and address
-					//d.ConnectionStatus = v.Connected
 					d.ConnectionStatus = ConnectionStatustmp
 
 					if d.HardwareID == arg {
@@ -1165,7 +1132,6 @@ TRY1:
 						GloabalID:        -1,
 						Address:          tempaddr[0],
 						ConnectionStatus: ConnectionStatustmp}
-					//ReconnectFlag:    false}
 				}
 			}
 		}

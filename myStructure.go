@@ -197,7 +197,6 @@ type nodeData struct {
 	GloabalID        int
 	Address          string
 	ConnectionStatus int
-	//ReconnectFlag    bool
 }
 
 // A EventConnect Struct
