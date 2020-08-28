@@ -698,8 +698,10 @@ func fileChangeNotifier() {
 										for _, apptospawn := range element {
 											if key == apptospawn.CsciName {
 												//fmt.Println("G4----Setting status bit after reconnection in this application:", key)
+												Info.Printf("G9----%s :status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
 												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
 												v = v | (1 << lastDigit)
+												Info.Printf("G9----%s :status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
 												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
 												redundantDeploymentMap[key] = v
 												updateRedundantDeploymentMap()
@@ -831,7 +833,7 @@ func nodeDisconnectionNotifier() {
 							}
 							updateRedundantDeploymentMap()
 						} else {
-							Info.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
+							Warning.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
 							fmt.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
 							selfIsolationCount++
 
