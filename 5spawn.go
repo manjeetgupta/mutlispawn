@@ -60,15 +60,15 @@ func init() {
 	// file can be replaced with os.Stdout or os.Stderr)
 	Info = log.New(file,
 		"INFO: ",
-		log.Ldate|log.Ltime|log.Llongfile)
+		log.Ldate|log.Ltime|log.Lshortfile|log.Lmicroseconds|log.Lmsgprefix)
 
 	Warning = log.New(file,
 		"WARNING: ",
-		log.Ldate|log.Ltime|log.Llongfile)
+		log.Ldate|log.Ltime|log.Lshortfile|log.Lmicroseconds|log.Lmsgprefix)
 
 	Error = log.New(file,
 		"ERROR: ",
-		log.Ldate|log.Ltime|log.Llongfile)
+		log.Ldate|log.Ltime|log.Lshortfile|log.Lmicroseconds|log.Lmsgprefix)
 }
 
 //Tag:9
