@@ -87,7 +87,7 @@ func readRedundantDeploymentMapFile() {
 			return
 		}
 		Info.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
-		fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+		//fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
 	}
 	Info.Println("<>Leaving readRedundantDeploymentMapFile funtion(9)")
 }
@@ -638,7 +638,6 @@ func fileChangeNotifier() {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
-			//req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=ItemFinished", nil)
 			if err != nil {
 				Error.Println("*G4---Error Creating request", err)
 			}
@@ -676,15 +675,21 @@ func fileChangeNotifier() {
 				if selfIsolationCount > 0 {
 					selfIsolationCount = 0
 
+					Info.Println("G4----Node has reconnected after disconnection")
 					fmt.Println("G4----Node has reconnected after disconnection")
+
+					//Tag:G9
 					go func() {
 						var exitLoop bool = false
 						for {
-							//Read connection map for connectionstatus of other nodes
+							//Read nodeconnection map for connectionstatus of GATEWAY/other nodes
 							d, _ := nodeConnectionMap["GATEWAY"] //update only status
-							Info.Println("G4----GATEWAY status:", d.ConnectionStatus)
+							//fmt.Println("G9----GATEWAY status:", d.ConnectionStatus)
 							//for _, element := range nodeConnectionMap {
-							if d.ConnectionStatus >= 7 {
+							//	if element.Address != "SELF" && element.ConnectionStatus >= 8 {
+							if d.ConnectionStatus >= 8 {
+								fmt.Println("G9----GATEWAY status has become :", d.ConnectionStatus)
+								Info.Println("G9----GATEWAY status has become :", d.ConnectionStatus)
 								for key, v := range redundantDeploymentMap {
 									c1 := v & (1 << lastDigit)
 									if c1 == 0 {
@@ -692,10 +697,10 @@ func fileChangeNotifier() {
 										element := deploymentConfigurationMap["1"+arg]
 										for _, apptospawn := range element {
 											if key == apptospawn.CsciName {
-												fmt.Println("G4----Setting status bit after reconnection in this application:", key)
-												fmt.Printf("G4----%s Status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
+												//fmt.Println("G4----Setting status bit after reconnection in this application:", key)
+												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
 												v = v | (1 << lastDigit)
-												fmt.Printf("G4----%s Status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
+												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
 												redundantDeploymentMap[key] = v
 												updateRedundantDeploymentMap()
 												break
@@ -826,17 +831,9 @@ func nodeDisconnectionNotifier() {
 							}
 							updateRedundantDeploymentMap()
 						} else {
-							Info.Printf("G6----This node has become self isolated:%d", selfIsolationCount)
+							Info.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
+							fmt.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
 							selfIsolationCount++
-
-							// if d, found := nodeConnectionMap["GATEWAY"]; found { //update only status
-							// 	Info.Println("GATEWAY:", d.ConnectionStatus)
-							// 	d.ConnectionStatus++
-							// 	if d.ConnectionStatus > 5 {
-							// 		d.ConnectionStatus = 1
-							// 	}
-							// 	nodeConnectionMap["GATEWAY"] = d
-							// }
 
 							//Turn itself into BLANK node
 							if selfIsolationCount == 1 { //For first time only
@@ -857,29 +854,12 @@ func nodeDisconnectionNotifier() {
 						}
 					} else {
 						//Increment count and then reset (6-10)
+						//Info.Println("When ping result is true")
 						element.ConnectionStatus++
-						if element.ConnectionStatus > 10 {
+						if element.ConnectionStatus > 10 || element.ConnectionStatus < 5 {
 							element.ConnectionStatus = 6
 						}
 						nodeConnectionMap[key] = element
-
-						// d, _ := nodeConnectionMap["GATEWAY"] //update only status
-						// Info.Println("GATEWAY:", d.ConnectionStatus)
-						// d.ConnectionStatus++
-						// if d.ConnectionStatus > 10 {
-						// 	d.ConnectionStatus = 6
-						// }
-						// nodeConnectionMap["GATEWAY"] = d
-
-						// if d, found := nodeConnectionMap["GATEWAY"]; found { //update only status
-						// 	Info.Println("GATEWAY:", d.ConnectionStatus)
-						// 	d.ConnectionStatus++
-						// 	if d.ConnectionStatus > 10 {
-						// 		d.ConnectionStatus = 6
-						// 	}
-						// 	nodeConnectionMap["GATEWAY"] = d
-						// }
-
 					}
 				}
 			}
@@ -1104,12 +1084,12 @@ TRY1:
 			if err != nil {
 				Error.Println("*12---Error Reading Connections response body", err)
 			}
-			//Info.Println("G4----Response recieved for Connections:", string(responseBody))
+			//Info.Println("12----Response recieved for Connections:", string(responseBody))
 
 			var result map[string]interface{}
 			json.Unmarshal(responseBody, &result)
 			responseConnectionMap := result["connections"].(map[string]interface{})
-			//Info.Println("G4----Connections Key inside respose object:==>\n", responseConnectionMap)
+			//Info.Println("12----Connections Key inside respose object:==>\n", responseConnectionMap)
 
 			//convert response to map
 			var connectionPartOnly = map[string]connections{}
