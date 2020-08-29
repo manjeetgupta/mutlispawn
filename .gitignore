@@ -4,3 +4,9 @@ amsmp2p
 *.json
 *~
 notes
+readme
+syncthing@.service
+execStartPre.sh
+amsmp2p.conf
+documentation.doc
+amsmp2p.service

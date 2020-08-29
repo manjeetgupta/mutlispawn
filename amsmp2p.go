@@ -1029,12 +1029,19 @@ func createNodeConnectionMap() {
 	}
 
 	req.Header.Set("X-API-Key", "manjeettest")
+	var try1Count int = 0
 TRY1:
 	resp, err := client.Do(req)
 	if err != nil {
 		Error.Println("*12---Error reading config response.", err)
 		time.Sleep(3 * time.Second)
-		goto TRY1
+		try1Count++
+		if try1Count > 10 {
+			Error.Println("*12---Trying for more than 30s. Now exiting gracefully.")
+			os.Exit(0)
+		} else {
+			goto TRY1
+		}
 
 	} else {
 		Info.Println("12----Server is up & running.")
