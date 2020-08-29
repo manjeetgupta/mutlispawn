@@ -780,8 +780,8 @@ func nodeDisconnectionNotifier() {
 	ticker := time.NewTicker(10 * time.Second)
 
 	if startFor { //Wait for trigger
-		for _ = range ticker.C {
-			Info.Println("G6----Ticker entered:", nodeConnectionMap)
+		for now := range ticker.C {
+			Info.Printf("G6----Ticker entered %v :%v", now, nodeConnectionMap)
 			for key, element := range nodeConnectionMap { //Iterate map every 10 sec
 				if element.Address != "SELF" {
 					pingresult := pingtest(element.Address)
