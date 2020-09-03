@@ -36,6 +36,7 @@ var gatewayIP string
 var selfID string
 var lastDigit int
 var selfIsolationCount int
+var redundantDeploymentMapFilePath string = "/root/Sync/redundantDeploymentMap.json"
 
 var (
 	// Info    :  Special Information
@@ -74,7 +75,8 @@ func init() {
 //Tag:9
 func readRedundantDeploymentMapFile() {
 	Info.Println("<>Inside readRedundantDeploymentMapFile funtion(9)")
-	jsonFile, err := os.Open("redundantDeploymentMap.json")
+	//jsonFile, err := os.Open("redundantDeploymentMap.json")
+	jsonFile, err := os.Open(redundantDeploymentMapFilePath)
 	defer jsonFile.Close()
 
 	if err != nil {
@@ -121,7 +123,8 @@ func initializeRedundantDeploymentMap() {
 		return
 	}
 	Info.Println("7----Marshalled Map to be saved in redundantDeploymentMap.json @initialization:", string(jsonString))
-	f, err := os.Create("redundantDeploymentMap.json")
+	//f, err := os.Create("redundantDeploymentMap.json")
+	f, err := os.Create(redundantDeploymentMapFilePath)
 	if err != nil {
 		Error.Println("7*---Create()", err)
 		return
@@ -144,7 +147,8 @@ func initializeRedundantDeploymentMap() {
 //Tag:6
 func updateRedundantDeploymentMap() {
 	Info.Println("<>Inside updateRedundantDeploymentMap funtion(6)")
-	f, err := os.Create("redundantDeploymentMap.json")
+	//f, err := os.Create("redundantDeploymentMap.json")
+	f, err := os.Create(redundantDeploymentMapFilePath)
 	defer f.Close()
 	if err != nil {
 		Error.Println("6*---Open()", err)
@@ -375,7 +379,8 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	//Initialize redundantDeploymentMap.json file if absent
-	if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
+	//if _, err := os.Stat("redundantDeploymentMap.json"); os.IsNotExist(err) {
+	if _, err := os.Stat(redundantDeploymentMapFilePath); os.IsNotExist(err) {
 		Info.Println("1----File redundantDeploymentMap.json does not exit. So creating a new file")
 		for i := 0; i < len(deploymentFileContent.App); i++ {
 			if deploymentFileContent.App[i].Redundant {
@@ -579,7 +584,8 @@ func main() {
 			if redundantTemp { //For Redundant Apps.
 
 				//Read map from redundantDeploymentMap.json
-				jsonFile, err := os.Open("redundantDeploymentMap.json")
+				//jsonFile, err := os.Open("redundantDeploymentMap.json")
+				jsonFile, err := os.Open(redundantDeploymentMapFilePath)
 				defer jsonFile.Close()
 				if err != nil {
 					Error.Println("1*---Inside crash:", err)
@@ -847,7 +853,8 @@ func nodeDisconnectionNotifier() {
 									redundantDeploymentMap[key] = v
 								}
 								updateRedundantDeploymentMap()
-								cmd := exec.Command("/usr/bin/touch", "redundantDeploymentMap.json", "-r", "5spawn")
+								//cmd := exec.Command("/usr/bin/touch", "redundantDeploymentMap.json", "-r", "5spawn")
+								cmd := exec.Command("/usr/bin/touch", redundantDeploymentMapFilePath, "-r", "5spawn")
 								err := cmd.Run()
 								if err != nil {
 									Error.Println("*G6----Error in touching the file:", err)
