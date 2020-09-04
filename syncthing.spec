@@ -28,8 +28,11 @@ install syncthing@.service %{buildroot}/%{_sysconfdir}/systemd/system/
 systemctl enable syncthing@root.service
 systemctl daemon-reload
 systemctl start syncthing@root.service
-sleep 10
+sleep 15
 systemctl stop syncthing@root.service
+sleep 5
+sed -i 's/<apikey>.*<\/apikey>/<apikey>manjeettest<\/apikey>/' /root/.config/syncthing/config.xml
+
 
 %preun
 systemctl stop syncthing@root.service

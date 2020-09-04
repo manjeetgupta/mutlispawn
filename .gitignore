@@ -8,5 +8,5 @@ readme
 syncthing@.service
 execStartPre.sh
 amsmp2p.conf
-documentation.doc
+documentation.*
 amsmp2p.service

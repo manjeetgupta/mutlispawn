@@ -15,7 +15,7 @@ rm -rf %{_sourcedir}/*
 install /root/Downloads/temp/%{name}  %{_sourcedir}
 install /root/Downloads/temp/%{name}.conf %{_sourcedir}
 install /root/Downloads/temp/readme %{_sourcedir}
-install /root/Downloads/temp/documentation.doc %{_sourcedir}
+install /root/Downloads/temp/documentation.pdf %{_sourcedir}
 install /root/Downloads/temp/DeploymentConfiguration.xml %{_sourcedir}
 install /root/Downloads/temp/amsmp2p@.service %{_sourcedir}
 
@@ -25,7 +25,7 @@ cd %{_sourcedir}/
 %{__mkdir_p} %{buildroot}/%{_prefix}/local/bin/AMSM/
 %{__mkdir_p} %{buildroot}/%{_prefix}/bin/
 %{__mkdir_p} %{buildroot}/%{_sysconfdir}/systemd/system/
-install DeploymentConfiguration.xml readme documentation.doc %{buildroot}/%{_prefix}/local/bin/AMSM/
+install DeploymentConfiguration.xml readme documentation.pdf %{buildroot}/%{_prefix}/local/bin/AMSM/
 install %{name} %{buildroot}/%{_prefix}/bin/
 install %{name}.conf %{buildroot}/%{getenv:HOME}/.config/AMSM/
 install amsmp2p@.service %{buildroot}/%{_sysconfdir}/systemd/system/
@@ -33,7 +33,7 @@ install amsmp2p@.service %{buildroot}/%{_sysconfdir}/systemd/system/
 %files
 %attr(0744, root, root) %{_prefix}/bin/%{name}
 %attr(0744, root, root) %doc %{_prefix}/local/bin/AMSM/readme
-%attr(0744, root, root) %doc %{_prefix}/local/bin/AMSM/documentation.doc
+%attr(0744, root, root) %doc %{_prefix}/local/bin/AMSM/documentation.pdf
 %attr(0744, root, root) %config(noreplace) %{_prefix}/local/bin/AMSM/DeploymentConfiguration.xml
 %attr(0744, root, root) %config(noreplace) %{getenv:HOME}/.config/AMSM/%{name}.conf
 %attr(0744, root, root) %{_sysconfdir}/systemd/system/amsmp2p@.service
