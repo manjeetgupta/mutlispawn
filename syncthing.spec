@@ -32,6 +32,11 @@ sleep 15
 systemctl stop syncthing@root.service
 sleep 5
 sed -i 's/<apikey>.*<\/apikey>/<apikey>manjeettest<\/apikey>/' /root/.config/syncthing/config.xml
+sleep 2
+sed -i 's/rescanIntervalS=.*/rescanIntervalS=5 fsWatcherEnabled=false fsWatcherDelayS=10 ignorePerms=false autoNormalize=true>/' /root/.config/syncthing/config.xml
+sleep 2
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+sleep 2
 
 
 %preun

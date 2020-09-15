@@ -21,6 +21,7 @@ import (
 
 var nodeConnectionMap = map[string]nodeData{}
 var redundantDeploymentMap = map[string]uint16{}
+var redundantDeploymentMapInit = map[string]uint16{}
 var applicaitonpidStateMap = map[string]pidState{}
 var runtimedeploymentMap = map[int]appDetailruntime{}
 var deploymentConfigurationMap map[string][]appDetail
@@ -75,21 +76,27 @@ func init() {
 //Tag:9
 func readRedundantDeploymentMapFile() {
 	Info.Println("<>Inside readRedundantDeploymentMapFile funtion(9)")
-	//jsonFile, err := os.Open("redundantDeploymentMap.json")
-	jsonFile, err := os.Open(redundantDeploymentMapFilePath)
-	defer jsonFile.Close()
-
-	if err != nil {
-		Error.Println("9*---File open error:", err)
-	} else {
-		jsonString, _ := ioutil.ReadAll(jsonFile)
-		err = json.Unmarshal(jsonString, &redundantDeploymentMap)
-		if err != nil {
-			Error.Println("9*---Unmarshalling error:", err)
-			return
+	if selfIsolationCount > 0 {
+		for key, element := range redundantDeploymentMapInit {
+			redundantDeploymentMap[key] = element
 		}
-		Info.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
-		//fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+		Info.Printf("9----Map read from redundantDeploymentMap.json when isolated: %v\n", redundantDeploymentMap)
+	} else {
+		jsonFile, err := os.Open(redundantDeploymentMapFilePath)
+		defer jsonFile.Close()
+
+		if err != nil {
+			Error.Println("9*---File open error:", err)
+		} else {
+			jsonString, _ := ioutil.ReadAll(jsonFile)
+			err = json.Unmarshal(jsonString, &redundantDeploymentMap)
+			if err != nil {
+				Error.Println("9*---Unmarshalling error:", err)
+				return
+			}
+			Info.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+			//fmt.Printf("9----Map read from redundantDeploymentMap.json: %v\n", redundantDeploymentMap)
+		}
 	}
 	Info.Println("<>Leaving readRedundantDeploymentMapFile funtion(9)")
 }
@@ -385,6 +392,7 @@ func main() {
 		for i := 0; i < len(deploymentFileContent.App); i++ {
 			if deploymentFileContent.App[i].Redundant {
 				redundantDeploymentMap[deploymentFileContent.App[i].CsciName] = 0
+				redundantDeploymentMapInit[deploymentFileContent.App[i].CsciName] = 0
 			}
 		}
 		initializeRedundantDeploymentMap()
@@ -792,7 +800,7 @@ func nodeDisconnectionNotifier() {
 				if element.Address != "SELF" && element.Address != "" {
 					pingresult := pingtest(element.Address)
 					if pingresult == false {
-						//Increment count and then reset (1-5)
+						//Increment count and then reset (1-5) for disconnection
 						element.ConnectionStatus++
 						if element.ConnectionStatus > 5 {
 							element.ConnectionStatus = 1
@@ -845,19 +853,20 @@ func nodeDisconnectionNotifier() {
 
 							//Turn itself into BLANK node
 							if selfIsolationCount == 1 { //For first time only
-								Info.Println("G6----Last Digit:", lastDigit)
-								for key, v := range redundantDeploymentMap {
-									Info.Printf("G6----%s==>%016b\n", key, v)
-									v = 0
-									Info.Printf("G6 after self-isolation----%s==>%016b\n", key, v)
-									redundantDeploymentMap[key] = v
-								}
-								updateRedundantDeploymentMap()
-								//cmd := exec.Command("/usr/bin/touch", "redundantDeploymentMap.json", "-r", "5spawn")
-								cmd := exec.Command("/usr/bin/touch", redundantDeploymentMapFilePath, "-r", "5spawn")
+								// Info.Println("G6----Last Digit:", lastDigit)
+								// for key, v := range redundantDeploymentMap {
+								// 	Info.Printf("G6----%s==>%016b\n", key, v)
+								// 	v = 0
+								// 	Info.Printf("G6 after self-isolation----%s==>%016b\n", key, v)
+								// 	redundantDeploymentMap[key] = v
+								// }
+								//updateRedundantDeploymentMap()
+								//cmd := exec.Command("/usr/bin/touch", redundantDeploymentMapFilePath, "-r", "/usr/bin/amsmp2p")
+
+								cmd := exec.Command("/usr/bin/rm", "-f", redundantDeploymentMapFilePath)
 								err := cmd.Run()
 								if err != nil {
-									Error.Println("*G6----Error in touching the file:", err)
+									Error.Println("*G6----Error in removing the file:", err)
 								}
 							}
 						}

@@ -18,6 +18,7 @@ install /root/Downloads/temp/readme %{_sourcedir}
 install /root/Downloads/temp/documentation.pdf %{_sourcedir}
 install /root/Downloads/temp/DeploymentConfiguration.xml %{_sourcedir}
 install /root/Downloads/temp/amsmp2p@.service %{_sourcedir}
+install /root/Downloads/temp/see %{_sourcedir}
 
 %install
 cd %{_sourcedir}/
@@ -29,9 +30,11 @@ install DeploymentConfiguration.xml readme documentation.pdf %{buildroot}/%{_pre
 install %{name} %{buildroot}/%{_prefix}/bin/
 install %{name}.conf %{buildroot}/%{getenv:HOME}/.config/AMSM/
 install amsmp2p@.service %{buildroot}/%{_sysconfdir}/systemd/system/
+install see %{buildroot}/%{_prefix}/bin/
 
 %files
 %attr(0744, root, root) %{_prefix}/bin/%{name}
+%attr(0744, root, root) %{_prefix}/bin/see
 %attr(0744, root, root) %doc %{_prefix}/local/bin/AMSM/readme
 %attr(0744, root, root) %doc %{_prefix}/local/bin/AMSM/documentation.pdf
 %attr(0744, root, root) %config(noreplace) %{_prefix}/local/bin/AMSM/DeploymentConfiguration.xml
