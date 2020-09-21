@@ -21,7 +21,6 @@ import (
 
 var nodeConnectionMap = map[string]nodeData{}
 var redundantDeploymentMap = map[string]uint16{}
-var redundantDeploymentMapInit = map[string]uint16{}
 var applicaitonpidStateMap = map[string]pidState{}
 var runtimedeploymentMap = map[int]appDetailruntime{}
 var deploymentConfigurationMap map[string][]appDetail
@@ -77,10 +76,13 @@ func init() {
 func readRedundantDeploymentMapFile() {
 	Info.Println("<>Inside readRedundantDeploymentMapFile funtion(9)")
 	if selfIsolationCount > 0 {
-		for key, element := range redundantDeploymentMapInit {
-			redundantDeploymentMap[key] = element
+		Info.Printf("9----In memory Map of redundantDeploymentMap when isolated: %v\n", redundantDeploymentMap)
+		for key, element := range redundantDeploymentMap {
+			if element > 0 {
+				redundantDeploymentMap[key] = 0
+			}
 		}
-		Info.Printf("9----Map read from redundantDeploymentMap.json when isolated: %v\n", redundantDeploymentMap)
+		Info.Printf("9----Map from redundantDeploymentMap when isolated: %v\n", redundantDeploymentMap)
 	} else {
 		jsonFile, err := os.Open(redundantDeploymentMapFilePath)
 		defer jsonFile.Close()
@@ -392,7 +394,6 @@ func main() {
 		for i := 0; i < len(deploymentFileContent.App); i++ {
 			if deploymentFileContent.App[i].Redundant {
 				redundantDeploymentMap[deploymentFileContent.App[i].CsciName] = 0
-				redundantDeploymentMapInit[deploymentFileContent.App[i].CsciName] = 0
 			}
 		}
 		initializeRedundantDeploymentMap()
@@ -714,10 +715,19 @@ func fileChangeNotifier() {
 												//fmt.Println("G4----Setting status bit after reconnection in this application:", key)
 												Info.Printf("G9----%s :status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
 												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap before reconnection :%016b\n", key, v)
+												vv := v
 												v = v | (1 << lastDigit)
 												Info.Printf("G9----%s :status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
 												fmt.Printf("G9----%s :status bit present in redundantDeploymentMap after reconnection :%016b\n", key, v)
 												redundantDeploymentMap[key] = v
+
+												//If application has running on isolated node is has only one instance and it is passive, then turn into active
+												//TODO
+												if vv&255 == 0 {
+													statebit := lastDigit + 8
+													v = v | (1 << statebit)
+													redundantDeploymentMap[key] = v
+												}
 												updateRedundantDeploymentMap()
 												break
 											}

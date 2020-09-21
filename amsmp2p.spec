@@ -18,6 +18,7 @@ install /root/Downloads/temp/readme %{_sourcedir}
 install /root/Downloads/temp/documentation.pdf %{_sourcedir}
 install /root/Downloads/temp/DeploymentConfiguration.xml %{_sourcedir}
 install /root/Downloads/temp/amsmp2p@.service %{_sourcedir}
+install /root/Downloads/temp/sandwich@.service %{_sourcedir}
 install /root/Downloads/temp/see %{_sourcedir}
 
 %install
@@ -30,6 +31,7 @@ install DeploymentConfiguration.xml readme documentation.pdf %{buildroot}/%{_pre
 install %{name} %{buildroot}/%{_prefix}/bin/
 install %{name}.conf %{buildroot}/%{getenv:HOME}/.config/AMSM/
 install amsmp2p@.service %{buildroot}/%{_sysconfdir}/systemd/system/
+install sandwich@.service %{buildroot}/%{_sysconfdir}/systemd/system/
 install see %{buildroot}/%{_prefix}/bin/
 
 %files
@@ -40,15 +42,21 @@ install see %{buildroot}/%{_prefix}/bin/
 %attr(0744, root, root) %config(noreplace) %{_prefix}/local/bin/AMSM/DeploymentConfiguration.xml
 %attr(0744, root, root) %config(noreplace) %{getenv:HOME}/.config/AMSM/%{name}.conf
 %attr(0744, root, root) %{_sysconfdir}/systemd/system/amsmp2p@.service
+%attr(0744, root, root) %{_sysconfdir}/systemd/system/sandwich@.service
 
 %pre
 mkdir -p /usr/local/bin/AMSM
 
 %post 
 systemctl enable amsmp2p@root.service
+systemctl enable sandwich@root.service
 systemctl daemon-reload
+echo "*/5  *  *  *  * root  rm -f /root/Sync/*conflict*" >> /etc/crontab
+systemctl enable crond.service
+
 
 %preun
+systemctl stop sandwich@root.service
 systemctl stop amsmp2p@root.service
 systemctl kill amsmp2p@root.service
 systemctl disable amsmp2p@root.service

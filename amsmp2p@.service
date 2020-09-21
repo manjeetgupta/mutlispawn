@@ -1,9 +1,9 @@
 [Unit]
 Description=P2P service
-Wants=syncthing@root.service
-After=syncthing@root.service
-PartOf=syncthing@root.service
-#BindsTo=syncthing@root.service
+Wants=sandwich@root.service
+After=sandwich@root.service
+PartOf=sandwich@root.service
+BindsTo=sandwich@root.service
 
 
 [Service]
@@ -11,9 +11,6 @@ User=%i
 Type=simple
 WorkingDirectory=/usr/local/bin/AMSM
 EnvironmentFile=/%i/.config/AMSM/amsmp2p.conf
-ExecStartPre=/usr/bin/rm -f /usr/local/bin/AMSM/amsm${HWID}.log
-ExecStartPre=/usr/bin/rm -f /usr/local/bin/AMSM/clientState${HWID}.json
-ExecStartPre=/bin/bash -c "/usr/sbin/sysctl -w net.ipv4.ping_group_range='0 2147483647'"
 ExecStart=/usr/bin/amsmp2p ${HWID} ${GATEWAY}
 KillMode=process
 Restart=on-failure
