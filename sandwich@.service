@@ -1,0 +1,17 @@
+[Unit]
+Description=Sandwich service
+After=syncthing@root.service
+
+[Service]
+User=%i
+Type=oneshot
+WorkingDirectory=/usr/local/bin/AMSM
+EnvironmentFile=/%i/.config/AMSM/amsmp2p.conf
+ExecStartPre=/usr/bin/rm -f /usr/local/bin/AMSM/amsm${HWID}.log
+ExecStartPre=/usr/bin/rm -f /usr/local/bin/AMSM/clientState${HWID}.json
+ExecStartPre=/bin/bash -c "/usr/sbin/sysctl -w net.ipv4.ping_group_range='0 2147483647'"
+ExecStart=/usr/bin/sleep ${SYNCTIME}
+RemainAfterExit=true
+
+[Install]
+WantedBy=graphical.target
