@@ -685,7 +685,7 @@ func fileChangeNotifier() {
 				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
 				//Set its status bit whenever a node came after disconnection.
 				//Info.Println("G4----Response recieved:", string(responseBody))
-				readRedundantDeploymentMapFile()
+				//readRedundantDeploymentMapFile()
 
 				if selfIsolationCount > 0 {
 					selfIsolationCount = 0
@@ -705,6 +705,7 @@ func fileChangeNotifier() {
 							if d.ConnectionStatus >= 8 {
 								fmt.Println("G9----GATEWAY status has become :", d.ConnectionStatus)
 								Info.Println("G9----GATEWAY status has become :", d.ConnectionStatus)
+								readRedundantDeploymentMapFile()
 								for key, v := range redundantDeploymentMap {
 									c1 := v & (1 << lastDigit)
 									if c1 == 0 {
@@ -722,7 +723,6 @@ func fileChangeNotifier() {
 												redundantDeploymentMap[key] = v
 
 												//If application has running on isolated node is has only one instance and it is passive, then turn into active
-												//TODO
 												if vv&255 == 0 {
 													statebit := lastDigit + 8
 													v = v | (1 << statebit)
@@ -982,7 +982,7 @@ func pingtest(ipaddress string) bool {
 
 	pinger, err := ping.NewPinger(ipaddress)
 	if err != nil {
-		Error.Println("*10----Pinger creation error:", err)
+		Error.Println("*10----Pinger creation error:", err) //TODO: Sometimes correct IP is not provided.So again read the CONNECTION rest api
 		return true
 	}
 	pinger.Count = 2
@@ -1175,3 +1175,7 @@ TRY1:
 	}
 	Info.Println("<>Leaving createNodeConnectionMap funtion(12)")
 }
+
+//notes
+//Updataion of shared file is at 4 places--> spawnApp():After device disconnection confirmed: After reconnection;At reception of shutdown signal
+//G9----GATEWAY status has become 8
