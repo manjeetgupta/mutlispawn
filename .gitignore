@@ -5,7 +5,6 @@ amsmp2p
 *~
 notes
 readme
-syncthing@.service
 execStartPre.sh
 amsmp2p.conf
 documentation.*
