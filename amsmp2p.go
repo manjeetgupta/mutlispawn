@@ -323,7 +323,7 @@ func spawnApp(name string, arg string, flag bool, redundant bool) (chan int, err
 					//There is no active in the system
 					statebit := lastDigit + 8
 					v = v | (1 << statebit)
-					//update map
+					//update ma
 				}
 			} else { //on crash active multiple instance
 				Info.Println("2----Active crash multiple instance case :")
