@@ -48,6 +48,7 @@ var (
 )
 
 func init() {
+	selfIsolationCount = 0
 	arg = os.Args[1]
 	gatewayIP = os.Args[2]
 	lastDigit, _ = strconv.Atoi(arg)
@@ -649,7 +650,7 @@ func fileChangeNotifier() {
 	var mostRecentIDstr string
 
 	startFor := <-chStartFileNotifier
-	if startFor {
+	if startFor && selfIsolationCount == 0 {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=RemoteChangeDetected", nil)
@@ -906,7 +907,7 @@ func nodeConnectionNotifier() {
 	var mostRecentIDstr string
 
 	startFor := true
-	if startFor {
+	if startFor && selfIsolationCount == 0 {
 		for {
 			client := &http.Client{}
 			req, err := http.NewRequest("GET", "http://localhost:8384/rest/events?events=DeviceConnected", nil)
@@ -1179,3 +1180,4 @@ TRY1:
 //notes
 //Updataion of shared file is at 4 places--> spawnApp():After device disconnection confirmed: After reconnection;At reception of shutdown signal
 //G9----GATEWAY status has become 8
+//Periodic HTTP request is being sent from two plcaces: nodeConnectionNotifier() and fileChangeNotifier()
