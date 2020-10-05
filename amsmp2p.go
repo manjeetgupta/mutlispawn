@@ -21,6 +21,7 @@ import (
 
 var nodeConnectionMap = map[string]nodeData{}
 var redundantDeploymentMap = map[string]uint16{}
+var redundantDeploymentMapTemp = map[string]uint16{}
 var applicaitonpidStateMap = map[string]pidState{}
 var runtimedeploymentMap = map[int]appDetailruntime{}
 var deploymentConfigurationMap map[string][]appDetail
@@ -36,7 +37,9 @@ var gatewayIP string
 var selfID string
 var lastDigit int
 var selfIsolationCount int
+var singletonNode int = 0
 var redundantDeploymentMapFilePath string = "/root/Sync/redundantDeploymentMap.json"
+var z1 uint16 = 255
 
 var (
 	// Info    :  Special Information
@@ -682,7 +685,7 @@ func fileChangeNotifier() {
 			json.Unmarshal(responseBody, &responseObject)
 			//Info.Println("G4----Length of response:", len(responseObject))
 
-			if len(responseObject) > 0 {
+			if len(responseObject) > 0 || singletonNode == 2 {
 				//Read the file and implement logic for pushing the state change to apps in long polling REST API.TODO
 				//Set its status bit whenever a node came after disconnection.
 				//Info.Println("G4----Response recieved:", string(responseBody))
@@ -690,6 +693,7 @@ func fileChangeNotifier() {
 
 				if selfIsolationCount > 0 {
 					selfIsolationCount = 0
+					singletonNode = 0
 
 					Info.Println("G4----Node has reconnected after disconnection")
 					fmt.Println("G4----Node has reconnected after disconnection")
@@ -748,8 +752,10 @@ func fileChangeNotifier() {
 					}()
 				}
 
-				mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
-				mostRecentIDstr = strconv.Itoa(mostRecentID)
+				if len(responseObject) > 0 { //control can enter inside in two condiion 1) len>0 and 2) singletonNode =2. This check is for 2nd  case.
+					mostRecentID = responseObject[len(responseObject)-1].SubscriptionID
+					mostRecentIDstr = strconv.Itoa(mostRecentID)
+				}
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -806,93 +812,138 @@ func nodeDisconnectionNotifier() {
 
 	if startFor { //Wait for trigger
 		for now := range ticker.C {
-			Info.Printf("G6----Ticker entered %v :%v", now, nodeConnectionMap)
-			for key, element := range nodeConnectionMap { //Iterate map every 10 sec
-				if element.Address != "SELF" && element.Address != "" {
-					pingresult := pingtest(element.Address)
-					if pingresult == false {
-						//Increment count and then reset (1-5) for disconnection
-						element.ConnectionStatus++
-						if element.ConnectionStatus > 5 {
-							element.ConnectionStatus = 1
-						}
-						nodeConnectionMap[key] = element
-						Info.Println("G6----Checking with Gateway")
-						pingresult = pingtest(gatewayIP) //Check with Gateway
-						if pingresult == true {
-							Info.Println("G6----key:", key, "=>", element.HardwareID, element.Address, ": Device disconnection confirmed")
+			fmt.Println("Singlenode", singletonNode)
+			if singletonNode == 0 { //If node has become singleton, then no need to ping each IP.
+				Info.Printf("G6----Ticker entered %v :%v", now, nodeConnectionMap)
+				for key, element := range nodeConnectionMap { //Iterate map every 10 sec
+					if element.Address != "SELF" && element.Address != "" {
+						pingresult := pingtest(element.Address)
+						if pingresult == false {
+							//Increment count and then reset (1-5) for disconnection
+							element.ConnectionStatus++
+							if element.ConnectionStatus > 5 {
+								element.ConnectionStatus = 1
+							}
+							nodeConnectionMap[key] = element
+							Info.Println("G6----Checking with Gateway")
+							pingresult = pingtest(gatewayIP) //Check with Gateway
+							if pingresult == true {
+								Info.Println("G6----key:", key, "=>", element.HardwareID, element.Address, ": Device disconnection confirmed")
 
-							lastDigittemp, _ := strconv.Atoi(element.HardwareID)
-							//delete(nodeConnectionMap, mapKey)
-							lastDigittemp %= 10
-							//Diconnected node may have multiple apps,so scan whole map
-							for key, v := range redundantDeploymentMap {
-								Info.Printf("G6----%s==>%016b\n", key, v)
-								statebittemp := lastDigittemp + 8
-								c1 := v & (1 << lastDigittemp)
-								c2 := v & (1 << statebittemp)
+								lastDigittemp, _ := strconv.Atoi(element.HardwareID)
+								//delete(nodeConnectionMap, mapKey)
+								lastDigittemp %= 10
+								//Diconnected node may have multiple apps,so scan whole map
+								for key, v := range redundantDeploymentMap {
+									Info.Printf("G6----%s==>%016b\n", key, v)
+									statebittemp := lastDigittemp + 8
+									c1 := v & (1 << lastDigittemp)
+									c2 := v & (1 << statebittemp)
 
-								if c1 > 0 && c2 == 0 { //Passive
-									Info.Println("G6----Passive Case:")
-									v = v &^ (1 << lastDigittemp)
-									redundantDeploymentMap[key] = v
-									Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
-									//break
-								} else if c1 > 0 && c2 > 1 { //Active
-									Info.Println("G6----Active Case:")
-									v = v &^ (1 << lastDigittemp)
-									v = v &^ (1 << statebittemp)
-									vv := v
-									Info.Printf("G6----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
-									for i := 0; i < 8; i++ {
-										if vv&1 == 1 {
-											statebit := i + 8
-											v = v | (1 << statebit)
+									if c1 > 0 && c2 == 0 { //Passive
+										Info.Println("G6----Passive Case:")
+										v = v &^ (1 << lastDigittemp)
+										redundantDeploymentMap[key] = v
+										Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
+										//break
+									} else if c1 > 0 && c2 > 1 { //Active
+										Info.Println("G6----Active Case:")
+										v = v &^ (1 << lastDigittemp)
+										v = v &^ (1 << statebittemp)
+										vv := v
+										Info.Printf("G6----%s Bitmap before searching for other node in redundantDeploymentMap :%016b\n", key, v)
+										for i := 0; i < 8; i++ {
+											if vv&1 == 1 {
+												statebit := i + 8
+												v = v | (1 << statebit)
+											}
+											vv = vv >> 1
 										}
-										vv = vv >> 1
+										redundantDeploymentMap[key] = v
+										Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
+										//break
 									}
-									redundantDeploymentMap[key] = v
-									Info.Printf("G6----Bitmap after Change: %s==>%016b\n", key, v)
-									//break
+								}
+								updateRedundantDeploymentMap()
+							} else {
+								Warning.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
+								fmt.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
+								selfIsolationCount++
+
+								//Turn itself into BLANK node
+								if selfIsolationCount == 1 { //For first time only
+									// Info.Println("G6----Last Digit:", lastDigit)
+									// for key, v := range redundantDeploymentMap {
+									// 	Info.Printf("G6----%s==>%016b\n", key, v)
+									// 	v = 0
+									// 	Info.Printf("G6 after self-isolation----%s==>%016b\n", key, v)
+									// 	redundantDeploymentMap[key] = v
+									// }
+									//updateRedundantDeploymentMap()
+									//cmd := exec.Command("/usr/bin/touch", redundantDeploymentMapFilePath, "-r", "/usr/bin/amsmp2p")
+
+									// if ( I am only one in the system,then don't delete redundantDeploymentMapFilePath)
+
+									readRedundantDeploymentMapFileInTemp()
+									z1 := z1 &^ (1 << lastDigit)
+									for key, v := range redundantDeploymentMapTemp {
+										fmt.Printf("G6----%s==>%016b\n", key, v)
+										fmt.Printf("G6----z1==>%016b\n", z1)
+										c1 := v & z1
+										//fmt.Printf("G6----c1==>%016b\n", c1)
+										if c1 > 0 {
+											cmd := exec.Command("/usr/bin/rm", "-f", redundantDeploymentMapFilePath)
+											err := cmd.Run()
+											if err != nil {
+												Error.Println("*G6----Error in removing the file:", err)
+											}
+											break
+										} else {
+											singletonNode = 1
+											Warning.Println("G6----I am alone in the system")
+											fmt.Println("G6----I am alone in the system")
+											//Tag:G10
+											go func() {
+												var exitLoop bool = false
+												for {
+													pingresult = pingtest(gatewayIP) //Check with Gateway
+													if pingresult == true {
+														fmt.Println("G10----Gateway has been pinged successfully")
+														Info.Println("G10----Gateway has been pinged successfully")
+														singletonNode = 2
+														//selfIsolationCount = 0
+														exitLoop = true
+													}
+													if exitLoop {
+														break
+													} else {
+														fmt.Println("G10----Sleeping before pinging Gateway")
+														time.Sleep(10 * time.Second)
+													}
+												}
+											}()
+										}
+									}
+									// cmd := exec.Command("/usr/bin/rm", "-f", redundantDeploymentMapFilePath)
+									// err := cmd.Run()
+									// if err != nil {
+									// 	Error.Println("*G6----Error in removing the file:", err)
+									// }
 								}
 							}
-							updateRedundantDeploymentMap()
 						} else {
-							Warning.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
-							fmt.Printf("G6----This node has become self isolated:%d\n", selfIsolationCount)
-							selfIsolationCount++
-
-							//Turn itself into BLANK node
-							if selfIsolationCount == 1 { //For first time only
-								// Info.Println("G6----Last Digit:", lastDigit)
-								// for key, v := range redundantDeploymentMap {
-								// 	Info.Printf("G6----%s==>%016b\n", key, v)
-								// 	v = 0
-								// 	Info.Printf("G6 after self-isolation----%s==>%016b\n", key, v)
-								// 	redundantDeploymentMap[key] = v
-								// }
-								//updateRedundantDeploymentMap()
-								//cmd := exec.Command("/usr/bin/touch", redundantDeploymentMapFilePath, "-r", "/usr/bin/amsmp2p")
-
-								cmd := exec.Command("/usr/bin/rm", "-f", redundantDeploymentMapFilePath)
-								err := cmd.Run()
-								if err != nil {
-									Error.Println("*G6----Error in removing the file:", err)
-								}
+							//Increment count and then reset (6-10)
+							//Info.Println("When ping result is true")
+							element.ConnectionStatus++
+							if element.ConnectionStatus > 10 || element.ConnectionStatus < 5 {
+								element.ConnectionStatus = 6
 							}
+							nodeConnectionMap[key] = element
 						}
-					} else {
-						//Increment count and then reset (6-10)
-						//Info.Println("When ping result is true")
-						element.ConnectionStatus++
-						if element.ConnectionStatus > 10 || element.ConnectionStatus < 5 {
-							element.ConnectionStatus = 6
-						}
-						nodeConnectionMap[key] = element
 					}
 				}
+				//time.Sleep(2 * time.Second)
 			}
-			//time.Sleep(2 * time.Second)
 		}
 	}
 	Info.Println("<>Leaving nodeDisconnectionNotifier funtion(G6)")
@@ -1175,6 +1226,22 @@ TRY1:
 		chStartNodeDisconnectNotifier <- true
 	}
 	Info.Println("<>Leaving createNodeConnectionMap funtion(12)")
+}
+
+func readRedundantDeploymentMapFileInTemp() {
+	jsonFile, err := os.Open(redundantDeploymentMapFilePath)
+	defer jsonFile.Close()
+
+	if err != nil {
+		Error.Println("9*---File open error:", err)
+	} else {
+		jsonString, _ := ioutil.ReadAll(jsonFile)
+		err = json.Unmarshal(jsonString, &redundantDeploymentMapTemp)
+		if err != nil {
+			Error.Println("9*---Unmarshalling error:", err)
+			return
+		}
+	}
 }
 
 //notes
